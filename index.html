@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07110e"><meta name="apple-mobile-web-app-capable" content="yes"><title>TRACE · Data Scout</title><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"></head><body>
+<header><a class="brand" href="#">TR<span>▲</span>CE <small>DATA SCOUT</small></a><button id="resetBtn" class="iconBtn" aria-label="Reset demo">↻</button></header>
+<main>
+ <section id="homeView" class="view active">
+  <div class="statusRow"><span class="liveDot"></span><span>FAILURE ANALYSIS ACTIVE</span><span id="modelStatus">LOCAL VISION READY</span></div>
+  <article class="hero">
+   <div class="eyebrow">NEXT BEST EXPERIMENT <span>01</span></div>
+   <h1 id="instruction"></h1><p id="rationale" class="lede"></p>
+   <div class="scoreStrip"><div><b id="failureScore">—</b><small>FAILURE SIGNAL</small></div><div><b id="gapScore">—</b><small>DATA GAP</small></div><div><b id="priorityScore">—</b><small>PRIORITY</small></div></div>
+   <button id="recordThis" class="primary">RECORD THIS <span>→</span></button>
+  </article>
+  <section class="warning"><div><small>DATASET READINESS</small><strong><span id="coverage">—</span>%</strong></div><p id="datasetSummary"></p></section>
+  <div class="sectionHead"><h2>Where it breaks</h2><button data-view="mapView">VIEW MAP</button></div><div id="failureCards" class="failureCards"></div>
+ </section>
+ <section id="mapView" class="view"><button class="back" data-view="homeView">← BACK</button><p class="eyebrow">FAILURE-WEIGHTED COVERAGE</p><h1>Patterns before gaps.</h1><p class="lede">Cells rise when failures cluster in conditions your demonstrations underrepresent.</p><div id="coverageMap" class="coverageMap"></div><h2>Logged failures</h2><div id="failureLog"></div></section>
+ <section id="captureView" class="view capture"><button class="back" id="closeCapture">× CLOSE</button><div class="cameraFrame"><video id="preview" autoplay muted playsinline></video><canvas id="sample" hidden></canvas><div class="reticle"></div><div class="targetLabel"><small>TARGET EXPERIMENT</small><span id="captureTarget"></span></div></div><div class="captureControls"><span id="timer">00:00</span><button id="recordBtn" aria-label="Start recording"><i></i></button><span id="recState">READY</span></div></section>
+ <section id="reviewView" class="view"><p class="eyebrow">ON-DEVICE AUTO-TAGGING</p><h1>The phone proposes.<br>You confirm.</h1><div class="processing"><span id="processState">ANALYZING KEYFRAMES</span><div><i id="processBar"></i></div></div><div id="tagEditor" class="tagEditor"></div><button id="saveClip" class="primary" disabled>CONFIRM & ADD TO DATASET <span>→</span></button><button id="discardClip" class="textBtn">Discard clip</button></section>
+ <section id="successView" class="view success"><div class="pulse">✓</div><p class="eyebrow">LEARNING LOOP CLOSED</p><h1>New evidence added.</h1><p id="successCopy" class="lede"></p><div class="delta"><span>READINESS</span><b><s id="oldCoverage">—</s> → <em id="newCoverage">—</em></b></div><button class="primary" data-view="homeView">SEE NEXT EXPERIMENT <span>→</span></button></section>
+</main><nav><button class="navActive" data-view="homeView">⌁<span>NEXT</span></button><button data-view="mapView">▦<span>PATTERNS</span></button><button id="quickRecord">●<span>CAPTURE</span></button></nav><div id="toast"></div><script type="module" src="app.js"></script></body></html>

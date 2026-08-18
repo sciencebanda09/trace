@@ -1,0 +1,1 @@
+{"name":"trace-data-scout","private":true,"version":"1.0.0","scripts":{"dev":"python -m http.server 4173","build":"node scripts/build.mjs"}}
