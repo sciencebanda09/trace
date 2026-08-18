@@ -1,6 +1,7 @@
 const LABELS = ['person','bicycle','car','motorcycle','airplane','bus','train','truck','boat','traffic light','fire hydrant','stop sign','parking meter','bench','bird','cat','dog','horse','sheep','cow','elephant','bear','zebra','giraffe','backpack','umbrella','handbag','tie','suitcase','frisbee','skis','snowboard','sports ball','kite','baseball bat','baseball glove','skateboard','surfboard','tennis racket','bottle','wine glass','cup','fork','knife','spoon','bowl','banana','apple','sandwich','orange','broccoli','carrot','hot dog','pizza','donut','cake','chair','couch','potted plant','bed','dining table','toilet','tv','laptop','mouse','remote','keyboard','cell phone','microwave','oven','toaster','sink','refrigerator','book','clock','vase','scissors','teddy bear','hair drier','toothbrush'];
 let session = null;
 let loading = null;
+let runtimeBackend = 'unavailable';
 
 export async function initYolo() {
   if (session) return session;
@@ -8,14 +9,37 @@ export async function initYolo() {
   loading = (async () => {
     if (!globalThis.ort) throw new Error('ONNX Runtime Web did not load');
     ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/';
-    const providers = navigator.gpu ? ['webgpu', 'wasm'] : ['wasm'];
-    session = await ort.InferenceSession.create('./models/yolov8n.onnx', {
-      executionProviders: providers,
-      graphOptimizationLevel: 'all'
-    });
+    ort.env.wasm.numThreads = globalThis.crossOriginIsolated ? Math.min(4, Math.max(1, Math.floor((navigator.hardwareConcurrency || 2) / 2))) : 1;
+    const candidates = [];
+    if (navigator.gpu) candidates.push('webgpu');
+    if (navigator.ml) candidates.push('webnn');
+    candidates.push('wasm');
+    let lastError;
+    for (const provider of candidates) {
+      try {
+        session = await ort.InferenceSession.create('./models/yolov8n.onnx', {
+          executionProviders: [provider],
+          graphOptimizationLevel: 'all',
+          enableCpuMemArena: true,
+          enableMemPattern: true
+        });
+        const warmup = new ort.Tensor('float32', new Float32Array(3 * 640 * 640), [1, 3, 640, 640]);
+        await session.run({ [session.inputNames[0]]: warmup });
+        runtimeBackend = provider;
+        break;
+      } catch (error) {
+        lastError = error;
+        session = null;
+      }
+    }
+    if (!session) throw lastError || new Error('No supported YOLO execution provider');
     return session;
   })();
   return loading;
+}
+
+export function getYoloRuntime() {
+  return { backend: runtimeBackend, ready: Boolean(session) };
 }
 
 function iou(a, b) {
@@ -34,13 +58,20 @@ function suppress(boxes, threshold = 0.45, limit = 12) {
   return kept;
 }
 
-export async function detectObjects(source, confidenceThreshold = 0.32) {
+export async function detectObjects(source, confidenceThreshold = 0.27) {
   const model = await initYolo();
   const size = 640;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(source, 0, 0, size, size);
+  const sourceWidth = source.width || source.videoWidth;
+  const sourceHeight = source.height || source.videoHeight;
+  const scale = Math.min(size / sourceWidth, size / sourceHeight);
+  const renderWidth = sourceWidth * scale, renderHeight = sourceHeight * scale;
+  const padX = (size - renderWidth) / 2, padY = (size - renderHeight) / 2;
+  ctx.fillStyle = '#727272';
+  ctx.fillRect(0, 0, size, size);
+  ctx.drawImage(source, padX, padY, renderWidth, renderHeight);
   const rgba = ctx.getImageData(0, 0, size, size).data;
   const data = new Float32Array(3 * size * size);
   for (let i = 0; i < size * size; i++) {
@@ -55,8 +86,6 @@ export async function detectObjects(source, confidenceThreshold = 0.32) {
   const candidates = tensor.dims[1] === 84 ? tensor.dims[2] : tensor.dims[1];
   const channelFirst = tensor.dims[1] === 84;
   const at = (channel, index) => channelFirst ? values[channel * candidates + index] : values[index * 84 + channel];
-  const sourceWidth = source.width || source.videoWidth;
-  const sourceHeight = source.height || source.videoHeight;
   const boxes = [];
   for (let i = 0; i < candidates; i++) {
     let classId = 0, confidence = 0;
@@ -65,11 +94,15 @@ export async function detectObjects(source, confidenceThreshold = 0.32) {
       if (score > confidence) { confidence = score; classId = c; }
     }
     if (confidence < confidenceThreshold) continue;
-    const width = at(2, i) / size * sourceWidth;
-    const height = at(3, i) / size * sourceHeight;
-    const x = at(0, i) / size * sourceWidth - width / 2;
-    const y = at(1, i) / size * sourceHeight - height / 2;
-    boxes.push({ x, y, width, height, confidence, classId, label: LABELS[classId] });
+    const width = at(2, i) / scale;
+    const height = at(3, i) / scale;
+    const x = (at(0, i) - padX) / scale - width / 2;
+    const y = (at(1, i) - padY) / scale - height / 2;
+    const clampedX = Math.max(0, x), clampedY = Math.max(0, y);
+    const clampedWidth = Math.min(sourceWidth - clampedX, width);
+    const clampedHeight = Math.min(sourceHeight - clampedY, height);
+    if (clampedWidth <= 1 || clampedHeight <= 1) continue;
+    boxes.push({ x: clampedX, y: clampedY, width: clampedWidth, height: clampedHeight, confidence, classId, label: LABELS[classId], areaRatio: clampedWidth * clampedHeight / Math.max(1, sourceWidth * sourceHeight) });
   }
   return suppress(boxes);
 }

@@ -2,7 +2,7 @@
  * TRACE · Physical-AI Demonstration Acquisition Engine
  * Dynamic deterministic priority scoring, on-device vision, and evidence pipeline.
  */
-import { initYolo, detectObjects, drawDetections } from './yolo.js';
+import { initYolo, detectObjects, drawDetections, getYoloRuntime } from './yolo.js';
 
 // Dynamic Schema Definition
 const SCHEMA = {
@@ -146,13 +146,15 @@ let yoloReady = false;
 let yoloBusy = false;
 let detectionFrames = [];
 let detectionPromises = [];
+let detectionCanvases = [];
+let yoloLatencyMs = 0;
 
 async function loadYoloModel() {
   const status = $('#yoloLiveStatus');
   try {
     await initYolo();
     yoloReady = true;
-    if (status) status.textContent = 'YOLOv8n · ON-DEVICE';
+    if (status) status.textContent = `YOLOv8n · ${getYoloRuntime().backend.toUpperCase()}`;
   } catch (error) {
     console.error('YOLO load failed:', error);
     if (status) status.textContent = 'YOLO UNAVAILABLE';
@@ -2141,11 +2143,16 @@ function sampleFrame() {
 
     // Run the open-source MobileNet backbone on alternating keyframes. The
     // cloned canvas prevents subsequent camera frames from changing inference input.
-    if (visionModel && capturedFrameCanvases.length % 2 === 1) {
+    if (visionModel && !yoloReady && capturedFrameCanvases.length % 3 === 1) {
       embeddingPromises.push(extractMobileNetEmbedding(snap));
     }
-    if (yoloReady && !yoloBusy && capturedFrameCanvases.length % 4 === 1) {
-      const task = runYoloFrame(snap, capturedFrameCanvases.length - 1);
+    if (yoloReady && !yoloBusy && (capturedFrameCanvases.length === 1 || capturedFrameCanvases.length % 4 === 0)) {
+      const detectorFrame = document.createElement('canvas');
+      detectorFrame.width = 320;
+      detectorFrame.height = 240;
+      detectorFrame.getContext('2d').drawImage(video, 0, 0, detectorFrame.width, detectorFrame.height);
+      detectionCanvases.push(detectorFrame);
+      const task = runYoloFrame(detectorFrame, capturedFrameCanvases.length - 1);
       detectionPromises.push(task);
     }
 
@@ -2208,12 +2215,14 @@ function sampleFrame() {
 async function runYoloFrame(canvas, frameIndex) {
   yoloBusy = true;
   try {
+    const started = performance.now();
     const detections = await detectObjects(canvas);
-    detectionFrames.push({ frameIndex, at: frameIndex * 0.5, detections });
+    yoloLatencyMs = performance.now() - started;
+    detectionFrames.push({ frameIndex, at: frameIndex * CAPTURE_CONFIG.keyframeIntervalMs / 1000, detections });
     const overlay = $('#detectionOverlay');
     if (overlay) drawDetections(overlay, detections, canvas.width, canvas.height);
     const status = $('#yoloLiveStatus');
-    if (status) status.textContent = `YOLO · ${detections.length} OBJECT${detections.length === 1 ? '' : 'S'}`;
+    if (status) status.textContent = `YOLO · ${detections.length} · ${Math.round(yoloLatencyMs)}ms`;
   } catch (error) {
     console.warn('YOLO frame skipped:', error);
   } finally {
@@ -2285,6 +2294,7 @@ function toggleRecording() {
   objectLabels = [];
   detectionFrames = [];
   detectionPromises = [];
+  detectionCanvases = [];
   imuSamples = [];
   recordedDurationSeconds = 0;
   recordingStartedAt = performance.now();
@@ -2329,7 +2339,12 @@ async function finishRecording() {
   sampleFrame();
 
   recordedBlob = new Blob(chunks, { type: 'video/webm' });
-  await Promise.allSettled([...embeddingPromises, ...detectionPromises]);
+  await Promise.allSettled(detectionPromises);
+  if (visionModel && yoloReady && detectionCanvases.length) {
+    const selected = [detectionCanvases[0], detectionCanvases[Math.floor(detectionCanvases.length / 2)], detectionCanvases.at(-1)].filter((item, index, all) => item && all.indexOf(item) === index);
+    for (const canvas of selected) await extractMobileNetEmbedding(canvas);
+  }
+  await Promise.allSettled(embeddingPromises);
   endCamera();
   showView('reviewView');
   analyzeFrames();
@@ -2344,6 +2359,7 @@ async function analyzeUploadedVideo(file) {
   embeddingPromises = [];
   detectionFrames = [];
   detectionPromises = [];
+  detectionCanvases = [];
   objectLabels = [];
   const video = $('#preview');
   const url = URL.createObjectURL(file);
@@ -2361,7 +2377,12 @@ async function analyzeUploadedVideo(file) {
     await new Promise(resolve => video.onseeked = resolve);
     sampleFrame();
   }
-  await Promise.allSettled([...embeddingPromises, ...detectionPromises]);
+  await Promise.allSettled(detectionPromises);
+  if (visionModel && yoloReady && detectionCanvases.length) {
+    const selected = [detectionCanvases[0], detectionCanvases[Math.floor(detectionCanvases.length / 2)], detectionCanvases.at(-1)].filter((item, index, all) => item && all.indexOf(item) === index);
+    for (const canvas of selected) await extractMobileNetEmbedding(canvas);
+  }
+  await Promise.allSettled(embeddingPromises);
   URL.revokeObjectURL(url);
   endCamera();
   showView('reviewView');
@@ -2384,7 +2405,7 @@ function analyzeFrames() {
   const motionPeaks = motions.slice(1, -1).filter((m, i) => m > motions[i] * 1.35 && m > motions[i + 2] * 1.35 && m > 6).length;
 
   const allDetections = detectionFrames.flatMap(frame => frame.detections);
-  const largestArea = allDetections.reduce((max, d) => Math.max(max, d.width * d.height / (96 * 72)), 0);
+  const largestArea = allDetections.reduce((max, d) => Math.max(max, d.areaRatio || 0), 0);
   const detectedOcclusion = largestArea > 0.62 ? 'heavy' : (largestArea > 0.32 ? 'partial' : null);
   proposedTags = {
     occlusion: detectedOcclusion || (textureRatio < 0.32 ? 'heavy' : (textureRatio < 0.68 ? 'partial' : 'none')),
@@ -2566,7 +2587,7 @@ async function commitClip() {
     },
     detections: detectionFrames.map(frame => ({
       at: frame.at,
-      objects: frame.detections.map(({ label, confidence, x, y, width, height }) => ({ label, confidence, x, y, width, height }))
+      objects: frame.detections.map(({ label, confidence, x, y, width, height, areaRatio }) => ({ label, confidence, x, y, width, height, areaRatio }))
     })),
     video: recordedBlob
   };

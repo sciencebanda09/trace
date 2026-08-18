@@ -1,4 +1,4 @@
-const CACHE = 'trace-v9-optional-simulation';
+const CACHE = 'trace-v10-yolo-performance';
 const ASSETS = [
   './',
   './index.html',

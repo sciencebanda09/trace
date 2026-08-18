@@ -128,6 +128,8 @@ MobileNet provides the local visual embedding backbone and novelty signal. Conte
 
 YOLOv8n detects the 80 common COCO object classes; it is not an open-vocabulary detector. TRACE presents detections as evidence for reviewable tags rather than claiming metric 3D reconstruction from a single camera.
 
+Live detection uses dedicated 320×240 camera samples, serialized model execution, and WebGPU/WebNN when available with a multithreaded WASM fallback on cross-origin-isolated deployments. MobileNet embedding work is deferred until capture stops so the two models do not contend during recording.
+
 ## Model attribution
 
 - TensorFlow.js and MobileNet: Apache-2.0
