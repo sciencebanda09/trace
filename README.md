@@ -63,9 +63,10 @@ The fixed schema contains:
 - Camera capture through `getUserMedia` and `MediaRecorder`
 - Multi-keyframe local analysis for brightness, texture, edge orientation, scene bias, and motion
 - Auto-tag proposals with one-tap correction
-- Failure-weighted priority scoring
-- Local persistence using IndexedDB
-- Failure-pattern and coverage visualization
+- Interactive 3D physical workcell simulator with 60 FPS trajectory playback, Lambertian shading, drop shadows, and multi-angle camera presets (ISO, TOP, FRONT, TCP)
+- Real-time grasp kinematics simulation (standby, approach, clamp, lift & verify) with collision avoidance envelopes
+- Quick Condition Testing Lab & expanded 6-DOF Spatial Workspace Inspector
+- Failure-pattern and coverage matrix visualization
 - Offline app-shell caching through a service worker
 - Deliberately biased 20-clip seed dataset for a repeatable demonstration
 

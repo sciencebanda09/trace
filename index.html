@@ -190,22 +190,112 @@
               </div>
             </div>
 
-            <!-- Right: Interactive 2.5D Physical Scene Visualizer Preview -->
+            <!-- Right: Interactive 3D Physical Scene Visualizer Preview -->
             <div class="spotlight-visualizer">
               <div class="visualizer-card">
                 <div class="visualizer-header">
-                  <span class="visualizer-title">SPATIAL SCENE PREVIEW</span>
-                  <span id="sceneStatusBadge" class="visualizer-badge">Interactive 2.5D View</span>
-                </div>
-                <div class="canvas-container">
-                  <canvas id="spatialCanvas" width="340" height="240"></canvas>
-                  <div class="spatial-hud-overlay">
-                    <span id="spatialOcclLabel" class="hud-tag">Occlusion: None</span>
-                    <span id="spatialOrientLabel" class="hud-tag">Orientation: Upright</span>
+                  <div class="visualizer-header-left">
+                    <span class="visualizer-title">SPATIAL SCENE PREVIEW</span>
+                    <span id="sceneStatusBadge" class="visualizer-badge">3D Physical Sim · 60 FPS</span>
+                  </div>
+                  <div class="visualizer-header-actions">
+                    <button id="spatialSimGraspBtn" class="vis-action-btn active" title="Simulate Grasp Cycle (Approach & Lift)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                      <span id="spatialSimGraspText">Grasp Sim</span>
+                    </button>
+                    <button id="spatialAutoOrbitBtn" class="vis-action-btn" title="Toggle Auto Turntable Orbit">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                      <span>Orbit</span>
+                    </button>
+                    <button id="spatialViewModeBtn" class="vis-action-btn" title="Toggle Render Mode: Shaded / Wireframe / Collision Heatmap">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                      <span id="spatialViewModeText">Shaded</span>
+                    </button>
+                    <button id="spatialResetCamBtn" class="vis-action-btn icon-only" title="Reset Camera View (⟲)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                    </button>
+                    <button id="spatialExpandBtn" class="vis-action-btn icon-only" title="Deep Workspace 3D Inspector (Modal)">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                    </button>
                   </div>
                 </div>
+
+                <div class="canvas-container" id="spatialCanvasContainer">
+                  <canvas id="spatialCanvas" width="380" height="260"></canvas>
+                  
+                  <!-- Top-Left Camera Presets -->
+                  <div class="spatial-cam-presets">
+                    <button class="cam-preset-pill active" data-cam="iso" title="Isometric 3D Orbital Camera">ISO</button>
+                    <button class="cam-preset-pill" data-cam="top" title="Top-Down Bird's Eye Orthogonal">TOP</button>
+                    <button class="cam-preset-pill" data-cam="front" title="Front Elevation Profile">FRONT</button>
+                    <button class="cam-preset-pill" data-cam="tcp" title="Robot Wrist Tool Center Point Ego POV">TCP</button>
+                  </div>
+
+                  <!-- Top-Right Environment & Lighting Badges -->
+                  <div class="spatial-top-hud">
+                    <span id="spatialLuxTag" class="hud-tag" title="Illuminance Level">💡 480 Lux</span>
+                    <span id="spatialSurfaceTag" class="hud-tag" title="Workcell Ground Surface">⚙️ Bench [Al]</span>
+                  </div>
+
+                  <!-- Center Grasp Phase Banner (animated cycle) -->
+                  <div id="spatialGraspPhaseBanner" class="spatial-grasp-banner">
+                    <span class="grasp-dot"></span>
+                    <span id="spatialGraspPhaseText">STANDBY · HOVER 120mm</span>
+                  </div>
+
+                  <!-- Bottom HUD Telemetry Overlay -->
+                  <div class="spatial-hud-overlay">
+                    <div class="hud-left-tags">
+                      <span id="spatialOcclLabel" class="hud-tag">Occlusion: None (100% LOS)</span>
+                      <span id="spatialOrientLabel" class="hud-tag">Orientation: Upright (0°)</span>
+                    </div>
+                    <div class="hud-right-tags">
+                      <span id="spatialClearanceLabel" class="hud-tag hud-tag-emerald">Clearance: Nominal</span>
+                      <span id="spatialCostLabel" class="hud-tag hud-tag-subtle">Cost: 1.00x</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Interactive Quick Condition Override & Testing Bar -->
+                <div class="spatial-quick-overrides">
+                  <div class="override-group-title">
+                    <span>INTERACTIVE SETUP LAB</span>
+                    <button id="spatialResetOverrideBtn" class="override-reset-btn" title="Snap back to deterministic recommendation">Reset to Target</button>
+                  </div>
+                  <div class="override-controls-grid">
+                    <div class="override-subgroup" data-override-category="environment">
+                      <span class="override-lbl">ENV:</span>
+                      <button class="override-chip active" data-val="bench">Bench</button>
+                      <button class="override-chip" data-val="floor">Floor</button>
+                    </div>
+                    <div class="override-subgroup" data-override-category="orientation">
+                      <span class="override-lbl">ORIENT:</span>
+                      <button class="override-chip active" data-val="upright">Upright</button>
+                      <button class="override-chip" data-val="rotated">Rotated</button>
+                      <button class="override-chip" data-val="inverted">Inverted</button>
+                    </div>
+                    <div class="override-subgroup" data-override-category="occlusion">
+                      <span class="override-lbl">OCCL:</span>
+                      <button class="override-chip active" data-val="none">None</button>
+                      <button class="override-chip" data-val="partial">Partial</button>
+                      <button class="override-chip" data-val="heavy">Heavy</button>
+                    </div>
+                    <div class="override-subgroup" data-override-category="lighting">
+                      <span class="override-lbl">LIGHT:</span>
+                      <button class="override-chip active" data-val="normal">Normal</button>
+                      <button class="override-chip" data-val="bright">Bright</button>
+                      <button class="override-chip" data-val="low-light">Low-Light</button>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="visualizer-footer">
-                  <span>💡 Drag to rotate scene • Visualizes target physical setup</span>
+                  <div class="vis-footer-left">
+                    <span>💡 Drag to orbit (360°/Pitch) • Scroll to zoom • Presets align view</span>
+                  </div>
+                  <div class="vis-footer-right">
+                    <span id="spatialFpsLabel" class="vis-fps">60 FPS</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -697,6 +787,97 @@
         <span>Weights</span>
       </button>
     </nav>
+
+    <!-- Expanded 3D Spatial Workcell & Grasp Inspector Modal -->
+    <div id="spatialInspectorModal" class="spatial-modal" role="dialog" aria-modal="true" aria-label="3D Spatial Workcell Inspector" hidden>
+      <div class="spatial-modal-backdrop" id="spatialModalBackdrop"></div>
+      <div class="spatial-modal-dialog">
+        <div class="spatial-modal-header">
+          <div class="modal-title-group">
+            <div class="brand-glyph sm">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <div>
+              <h2 class="modal-heading">3D Physical Workspace & Grasp Inspector</h2>
+              <span class="modal-subheading">High-Resolution 6-DOF Physical Workcell Simulation & Telemetry</span>
+            </div>
+          </div>
+          <button id="closeSpatialModal" class="btn-icon" aria-label="Close Inspector">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+
+        <div class="spatial-modal-body">
+          <div class="modal-canvas-column">
+            <div class="modal-canvas-frame">
+              <canvas id="spatialModalCanvas" width="760" height="480"></canvas>
+              <div class="modal-canvas-hud">
+                <div class="modal-cam-group">
+                  <button class="cam-preset-pill active" data-modal-cam="iso">ISO 3D</button>
+                  <button class="cam-preset-pill" data-modal-cam="top">TOP (XY)</button>
+                  <button class="cam-preset-pill" data-modal-cam="front">FRONT (XZ)</button>
+                  <button class="cam-preset-pill" data-modal-cam="tcp">WRIST CAM (TCP)</button>
+                </div>
+                <div class="modal-mode-group">
+                  <button id="modalSimGraspBtn" class="vis-action-btn active">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    <span>Simulate Grasp</span>
+                  </button>
+                  <button id="modalAutoOrbitBtn" class="vis-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    <span>Auto-Orbit</span>
+                  </button>
+                  <button id="modalRenderModeBtn" class="vis-action-btn">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+                    <span id="modalRenderModeText">Shaded</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-telemetry-column">
+            <!-- 6-DOF Spatial Kinematics -->
+            <div class="modal-section-card">
+              <span class="m-card-title">6-DOF WORKCELL POSE MATRIX</span>
+              <div class="kinematics-grid">
+                <div class="k-box"><span class="k-lbl">TCP X</span><b class="k-val" id="modalValX">0.0 mm</b></div>
+                <div class="k-box"><span class="k-lbl">TCP Y</span><b class="k-val" id="modalValY">0.0 mm</b></div>
+                <div class="k-box"><span class="k-lbl">TCP Z</span><b class="k-val" id="modalValZ">120.0 mm</b></div>
+                <div class="k-box"><span class="k-lbl">YAW θ</span><b class="k-val" id="modalValYaw">0.0°</b></div>
+                <div class="k-box"><span class="k-lbl">PITCH φ</span><b class="k-val" id="modalValPitch">0.0°</b></div>
+                <div class="k-box"><span class="k-lbl">ROLL ψ</span><b class="k-val" id="modalValRoll">0.0°</b></div>
+              </div>
+            </div>
+
+            <!-- Target Manipuland Physical Properties -->
+            <div class="modal-section-card">
+              <span class="m-card-title">PHYSICAL WORKCELL ATTRIBUTES</span>
+              <div class="spec-rows">
+                <div class="spec-row"><span>Ground Surface</span><b id="modalSpecSurface">Al-6061 Bench Grid</b></div>
+                <div class="spec-row"><span>Manipuland Bounding Box</span><b>44 × 44 × 38 mm</b></div>
+                <div class="spec-row"><span>Target Pose</span><b id="modalSpecOrient">Upright (0° Yaw)</b></div>
+                <div class="spec-row"><span>Optical Occlusion</span><b id="modalSpecOccl">None (100% Sightline)</b></div>
+                <div class="spec-row"><span>Illuminance Flux</span><b id="modalSpecLux">480 Lux (Nominal)</b></div>
+                <div class="spec-row"><span>Acquisition Cost Multiplier</span><b id="modalSpecCost">1.00x Base</b></div>
+              </div>
+            </div>
+
+            <!-- Modal Action Buttons -->
+            <div class="modal-actions-box">
+              <button id="modalRecordBtn" class="btn-primary-large">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                <span>RECORD DEMONSTRATION</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Global Toast Notification System -->
     <div id="toast" class="toast-popup" role="alert" aria-live="polite"></div>
