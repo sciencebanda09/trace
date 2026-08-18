@@ -66,6 +66,7 @@ The fixed schema contains:
 - TensorFlow.js MobileNetV1 embeddings extracted locally from sampled keyframes using WebGL
 - YOLOv8n general-object detection through ONNX Runtime Web during recording and review
 - Detection evidence explaining why each auto-tag was proposed
+- Optional interactive robot-arm setup preview for communicating the recommended experiment; it does not affect ranking or evidence
 - Embedding-distance novelty incorporated into deterministic priority scoring
 - Multi-keyframe features for brightness, texture, edge orientation, scene bias, and motion
 - Auto-tag proposals with one-tap correction

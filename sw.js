@@ -1,4 +1,4 @@
-const CACHE = 'trace-v8-product-capture';
+const CACHE = 'trace-v9-optional-simulation';
 const ASSETS = [
   './',
   './index.html',

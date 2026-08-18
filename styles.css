@@ -3282,7 +3282,6 @@ textarea {
 .yolo-live-status { position:absolute; right:12px; bottom:12px; z-index:9; padding:5px 8px; border:1px solid rgba(52,211,153,.45); border-radius:var(--radius-full); background:rgba(2,12,9,.76); color:var(--emerald-light); font:600 9px 'JetBrains Mono',monospace; backdrop-filter:blur(10px); }
 .detection-evidence-card { margin-bottom:16px; }
 #quickSimulateBtn, #menuAddSynthetic { display:none !important; }
-.spotlight-visualizer, .spatial-modal, .mobile-preview-btn { display:none !important; }
 .impact-comparison { display:grid; gap:10px; width:100%; margin:4px 0 20px; text-align:left; }
 .impact-row { display:grid; grid-template-columns:86px minmax(0,1fr) 82px; gap:10px; align-items:center; font-size:11px; }
 .impact-row span { color:var(--ink-muted); }

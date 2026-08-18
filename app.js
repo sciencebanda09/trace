@@ -487,6 +487,7 @@ function renderAll() {
   renderCoverageMatrix();
   renderDatasetVault();
   renderWeightsStudio();
+  drawSpatialVisualizer();
 }
 
 function renderSpotlight() {
@@ -574,6 +575,7 @@ window.selectTargetCandidate = function(idx) {
     recommendation = rankedExperiments[idx];
     renderSpotlight();
     renderCandidateQueue();
+    drawSpatialVisualizer();
     toast(`Switched target to Rank #${String(idx + 1).padStart(2, '0')}`);
   }
 };
@@ -2854,5 +2856,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadVisionModel();
   loadYoloModel();
   initEventListeners();
+  initSpatialVisualizer();
   loadDataset();
 });
