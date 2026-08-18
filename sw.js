@@ -1,4 +1,4 @@
-const CACHE = 'trace-v3-mobilenet';
+const CACHE = 'trace-v4-adaptive-ui';
 const ASSETS = [
   './',
   './index.html',

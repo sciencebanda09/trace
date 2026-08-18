@@ -2827,3 +2827,453 @@ code,
     bottom: 36px;
   }
 }
+
+/* ========================================================================== 
+   Adaptive Device Layer
+   Phone-first overrides for compact phones, foldables, tablets and landscape.
+   ========================================================================== */
+:root {
+  --page-gutter: clamp(14px, 4vw, 28px);
+  --content-width: 1320px;
+  --nav-height: 64px;
+}
+
+html {
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body,
+.app-shell {
+  min-height: 100svh;
+  min-height: 100dvh;
+}
+
+img, video, canvas, svg {
+  max-width: 100%;
+}
+
+.app-main,
+.header-container {
+  width: min(100%, var(--content-width));
+}
+
+.app-main {
+  margin-inline: auto;
+  padding-inline: var(--page-gutter);
+}
+
+button,
+[role="button"],
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+@media (max-width: 899px) {
+  body {
+    padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
+  }
+
+  .app-header {
+    position: sticky;
+  }
+
+  .header-container {
+    height: clamp(56px, 14vw, 64px);
+    padding-inline: var(--page-gutter);
+    gap: 10px;
+  }
+
+  .header-left {
+    min-width: 0;
+    gap: 9px;
+  }
+
+  .brand-link {
+    gap: 8px;
+    flex: 0 0 auto;
+  }
+
+  .brand-glyph {
+    width: 32px;
+    height: 32px;
+  }
+
+  .brand-title {
+    font-size: 15px;
+  }
+
+  .brand-badge {
+    font-size: 7px;
+  }
+
+  .system-status-pill {
+    min-width: 0;
+    max-width: min(42vw, 180px);
+    padding: 4px 8px;
+  }
+
+  #systemStatusText {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .header-right {
+    flex: 0 0 auto;
+    gap: 6px;
+  }
+
+  #quickRecordBtn {
+    display: none;
+  }
+
+  .app-main {
+    padding-top: clamp(14px, 4vw, 24px);
+    padding-bottom: 24px;
+  }
+
+  .view,
+  .view.active {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .spotlight-card,
+  .panel-card,
+  .glass-card,
+  .capture-wrapper,
+  .review-shell,
+  .success-card {
+    border-radius: clamp(12px, 4vw, 18px);
+  }
+
+  .spotlight-card,
+  .panel-card,
+  .glass-card {
+    padding: clamp(14px, 4vw, 22px);
+  }
+
+  .spotlight-header,
+  .section-header,
+  .view-header,
+  .panel-header,
+  .dataset-toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .spotlight-main-grid,
+  .matrix-layout-grid,
+  .weights-layout-grid,
+  .capture-layout,
+  .review-layout,
+  .modal-body,
+  .spatial-modal-body {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .spotlight-title,
+  .view-title,
+  .success-heading {
+    font-size: clamp(24px, 7.5vw, 36px);
+    line-height: 1.12;
+    overflow-wrap: anywhere;
+  }
+
+  .spotlight-lede,
+  .view-description,
+  .success-body {
+    font-size: clamp(13px, 3.7vw, 15px);
+  }
+
+  .signal-cards-row,
+  .summary-grid,
+  .stats-grid,
+  .metric-grid,
+  .telemetry-grid,
+  .kinematic-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .signal-card,
+  .summary-card,
+  .metric-card {
+    min-width: 0;
+  }
+
+  .target-badges-row,
+  .chip-row,
+  .filter-row,
+  .matrix-filter-row,
+  .vault-filter-row,
+  .modal-cam-group,
+  .modal-mode-group {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 3px;
+  }
+
+  .target-badges-row::-webkit-scrollbar,
+  .chip-row::-webkit-scrollbar,
+  .filter-row::-webkit-scrollbar,
+  .matrix-filter-row::-webkit-scrollbar,
+  .vault-filter-row::-webkit-scrollbar,
+  .modal-cam-group::-webkit-scrollbar,
+  .modal-mode-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .target-badges-row > *,
+  .chip-row > *,
+  .filter-row > *,
+  .matrix-filter-row > *,
+  .vault-filter-row > *,
+  .modal-cam-group > *,
+  .modal-mode-group > * {
+    flex: 0 0 auto;
+  }
+
+  .matrix-heatmap-grid,
+  .dataset-grid,
+  .vault-grid,
+  .keyframe-gallery {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  }
+
+  .permutation-cell,
+  .dataset-card,
+  .vault-card {
+    min-width: 0;
+  }
+
+  .table-wrap,
+  .matrix-table-wrap,
+  .dataset-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 620px;
+  }
+
+  .capture-mode {
+    padding-inline: 0;
+  }
+
+  .capture-wrapper {
+    width: 100%;
+    max-width: none;
+    min-height: calc(100dvh - 64px - var(--safe-top) - var(--nav-height) - var(--safe-bottom));
+  }
+
+  .camera-stage,
+  .camera-frame,
+  .viewfinder-shell {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    min-height: 0;
+    max-height: 64dvh;
+  }
+
+  #preview {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .capture-controls,
+  .shutter-controls {
+    position: sticky;
+    bottom: calc(var(--nav-height) + var(--safe-bottom));
+    z-index: 8;
+    padding-bottom: 12px;
+  }
+
+  .filmstrip,
+  .keyframe-live-strip,
+  .sampled-keyframe-gallery {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .spatial-modal {
+    padding: 0;
+  }
+
+  .spatial-modal-dialog {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-top: var(--safe-top);
+  }
+
+  .spatial-modal-header,
+  .spatial-modal-body {
+    padding-inline: var(--page-gutter);
+  }
+
+  .modal-subheading {
+    display: none;
+  }
+
+  .modal-canvas-frame {
+    min-height: 300px;
+    height: min(48dvh, 440px);
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  .btn-primary-large,
+  .btn-glass,
+  .chip-btn,
+  .tag-toggle-pill,
+  .dropdown-item {
+    min-height: 44px;
+  }
+
+  .mobile-bottom-nav {
+    height: calc(var(--nav-height) + var(--safe-bottom));
+  }
+
+  .mobile-tab-btn {
+    min-width: 0;
+    padding-inline: 2px;
+  }
+
+  .toast-popup {
+    max-width: calc(100vw - 28px);
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+@media (max-width: 599px) {
+  :root {
+    --page-gutter: clamp(12px, 4vw, 18px);
+  }
+
+  .system-status-pill {
+    max-width: 34vw;
+    font-size: 9px;
+  }
+
+  .spotlight-header .readiness-compact {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .signal-cards-row,
+  .summary-grid,
+  .stats-grid,
+  .metric-grid,
+  .telemetry-grid,
+  .kinematic-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .spotlight-actions,
+  .button-row,
+  .review-actions,
+  .success-btn-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .spotlight-actions > *,
+  .button-row > *,
+  .review-actions > *,
+  .success-btn-row > * {
+    width: 100%;
+  }
+
+  .matrix-heatmap-grid,
+  .dataset-grid,
+  .vault-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mobile-tab-btn span {
+    font-size: 8px;
+  }
+}
+
+@media (max-width: 379px) {
+  .system-status-pill,
+  .brand-badge {
+    display: none;
+  }
+
+  .header-container {
+    height: 54px;
+  }
+
+  .spotlight-card,
+  .panel-card,
+  .glass-card {
+    padding: 12px;
+  }
+
+  .pill-group {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .mobile-bottom-nav svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .mobile-shutter-circle {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+@media (max-width: 899px) and (orientation: landscape) and (max-height: 540px) {
+  :root { --nav-height: 54px; }
+
+  .header-container { height: 50px; }
+  .brand-badge, .system-status-pill { display: none; }
+  .camera-stage, .camera-frame, .viewfinder-shell {
+    aspect-ratio: 16 / 9;
+    max-height: calc(100dvh - 112px - var(--safe-bottom));
+  }
+  .mobile-bottom-nav { height: calc(54px + var(--safe-bottom)); }
+  .mobile-tab-btn { flex-direction: row; gap: 6px; }
+}
+
+@media (min-width: 900px) and (max-width: 1180px) {
+  :root { --page-gutter: 22px; }
+  .header-container { padding-inline: var(--page-gutter); }
+  .tab-btn { padding-inline: 10px; }
+  .tab-btn span { font-size: 11px; }
+  .spotlight-main-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, 36%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
