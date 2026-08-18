@@ -89,7 +89,7 @@
               <div class="dropdown-separator"></div>
               <button id="resetBtn" class="dropdown-item danger">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
-                <span>Reset Seed Dataset</span>
+                <span>Load Demo Dataset</span>
               </button>
             </div>
           </div>
@@ -589,7 +589,7 @@
               <span id="recordingIndicator" class="status-dot"></span>
               <span id="recState">STANDBY · READY</span>
             </div>
-            <div class="timer-tag" id="timer">00:00</div>
+              <div class="timer-tag" id="timer">00:00 / 00:30</div>
           </div>
 
           <!-- Video Viewport Frame -->
@@ -621,6 +621,7 @@
               <div class="hud-meter"><span class="meter-lbl">LUM</span><span id="hudLuminance" class="meter-val">--</span></div>
               <div class="hud-meter"><span class="meter-lbl">MOT</span><span id="hudMotion" class="meter-val">--</span></div>
               <div class="hud-meter"><span class="meter-lbl">FPS</span><span id="hudFps" class="meter-val">30</span></div>
+              <div class="hud-meter"><span class="meter-lbl">KEY</span><span id="hudKeyframes" class="meter-val">0</span></div>
             </div>
             <div id="yoloLiveStatus" class="yolo-live-status">YOLO · LOADING</div>
           </div>
@@ -632,7 +633,7 @@
               <span id="keyframeCountLabel">0 Frames</span>
             </div>
             <div id="keyframeLiveStrip" class="filmstrip-scroll">
-              <div class="filmstrip-placeholder">Recording keyframes will buffer here every 500ms...</div>
+              <div class="filmstrip-placeholder">Keyframes will appear while recording.</div>
             </div>
           </div>
 
@@ -648,7 +649,7 @@
               <button id="recordBtn" class="shutter-btn" aria-label="Record demonstration">
                 <div class="shutter-core"></div>
               </button>
-              <span class="shutter-label">Tap once to start · auto-stops at 8s</span>
+              <span class="shutter-label">Tap to record · stop anytime · 30s maximum</span>
             </div>
 
             <div class="footer-right">
@@ -680,13 +681,13 @@
 
           <button id="toggleDiagnostics" class="btn-glass diagnostics-toggle" aria-expanded="false">Show technical analysis</button>
 
-          <div class="glass-panel scene25d-card">
+          <div class="glass-panel detection-evidence-card">
             <div class="panel-header">
-              <div><h2 class="panel-title">Detected scene</h2><span class="panel-subtitle">YOLO objects projected into relative 2.5D depth</span></div>
+              <div><h2 class="panel-title">Why the phone proposed these tags</h2><span class="panel-subtitle">Evidence from YOLO, visual features and motion</span></div>
               <span id="detectedObjectCount" class="visualizer-badge">0 objects</span>
             </div>
-            <canvas id="scene25dCanvas" class="scene25d-canvas"></canvas>
-            <p class="scene25d-note">Relative depth is estimated from tracked box scale; it is not metric 3D reconstruction.</p>
+            <div id="detectionEvidenceList" class="detected-object-list"></div>
+            <div id="tagEvidenceList" class="tag-evidence-list"></div>
           </div>
 
           <!-- Computer Vision Feature Diagnostics -->
@@ -776,6 +777,7 @@
               <span id="newCoverage" class="val-curr">—</span>
             </div>
           </div>
+          <div id="impactComparison" class="impact-comparison" aria-label="Dataset impact"></div>
 
           <div class="success-btn-row">
             <button class="btn-primary-large" data-view="homeView">

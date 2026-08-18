@@ -1,4 +1,4 @@
-const CACHE = 'trace-v6-yolo-scene';
+const CACHE = 'trace-v8-product-capture';
 const ASSETS = [
   './',
   './index.html',

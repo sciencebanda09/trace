@@ -1,8 +1,8 @@
 /**
  * TRACE · Physical-AI Demonstration Acquisition Engine
- * Dynamic deterministic priority scoring, interactive 2.5D visualizer, and telemetry pipeline.
+ * Dynamic deterministic priority scoring, on-device vision, and evidence pipeline.
  */
-import { initYolo, detectObjects, drawDetections, drawScene25D } from './yolo.js';
+import { initYolo, detectObjects, drawDetections } from './yolo.js';
 
 // Dynamic Schema Definition
 const SCHEMA = {
@@ -12,6 +12,18 @@ const SCHEMA = {
   environment: ['bench', 'floor'],
   result: ['success', 'failure'],
   recovery: ['no', 'yes']
+};
+
+const CAPTURE_CONFIG = Object.freeze({
+  defaultMaxDurationSeconds: 30,
+  keyframeIntervalMs: 750,
+  uploadedVideoSampleLimit: 12
+});
+
+const taskProfile = {
+  id: 'generic-manipulation',
+  task: 'manipulation',
+  maxDurationSeconds: CAPTURE_CONFIG.defaultMaxDurationSeconds
 };
 
 // Seed dataset
@@ -42,13 +54,18 @@ const seed = seedSpecs.map((x, i) => ({
   id: `seed-${String(i + 1).padStart(2, '0')}`,
   created: Date.now() - (seedSpecs.length - i) * 3600000,
   source: 'seed',
+  durationSeconds: 6 + (i % 7),
+  sourceDevice: { platform: 'imported-demo-dataset', mobile: false },
+  task: 'manipulation',
+  object: i % 4 === 0 ? 'bottle' : 'cup',
   occlusion: x[0],
   lighting: x[1],
   orientation: x[2],
   environment: x[3],
   result: x[4],
   recovery: x[5],
-  notes: 'Automated baseline robot demonstration batch'
+  notes: 'Deterministic biased demonstration dataset',
+  evidence: []
 }));
 
 const $ = s => document.querySelector(s);
@@ -77,9 +94,49 @@ let ticker = null;
 let sampleTicker = null;
 let recordedBlob = null;
 let proposedTags = {};
+let proposedEvidence = {};
+let proposedTask = taskProfile.task;
+let proposedObject = 'unknown object';
 let frameMetrics = [];
 let capturedFrameCanvases = [];
 let currentFacingMode = 'environment';
+let recordingStartedAt = 0;
+let recordedDurationSeconds = 0;
+let imuSamples = [];
+let audioEnabled = false;
+let deviceCapabilities = null;
+
+function detectCapabilities() {
+  return {
+    camera: Boolean(navigator.mediaDevices?.getUserMedia),
+    microphone: Boolean(navigator.mediaDevices?.getUserMedia),
+    imu: 'DeviceMotionEvent' in globalThis,
+    gps: 'geolocation' in navigator,
+    webgl: Boolean(document.createElement('canvas').getContext('webgl')),
+    webgpu: Boolean(navigator.gpu),
+    indexedDB: 'indexedDB' in globalThis
+  };
+}
+
+function sourceDevice() {
+  return {
+    platform: navigator.userAgentData?.platform || navigator.platform || 'unknown',
+    mobile: navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent),
+    viewport: `${screen.width}x${screen.height}`,
+    pixelRatio: devicePixelRatio || 1
+  };
+}
+
+function collectMotionSample(event) {
+  if (!recordingStartedAt || imuSamples.length >= 300) return;
+  const a = event.accelerationIncludingGravity;
+  const r = event.rotationRate;
+  imuSamples.push({
+    t: performance.now() - recordingStartedAt,
+    acceleration: a ? [a.x, a.y, a.z] : null,
+    rotation: r ? [r.alpha, r.beta, r.gamma] : null
+  });
+}
 let visionModel = null;
 let modelBackend = 'unavailable';
 let embeddingSamples = [];
@@ -269,7 +326,7 @@ async function resetDataset() {
     clips = [...seed];
   }
   renderAll();
-  toast('Seed dataset restored');
+  toast('Deterministic demo dataset loaded');
 }
 
 /* ==========================================================================
@@ -400,12 +457,16 @@ function titleCase(str) {
   return String(str).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[character]);
+}
+
 function generateInstruction(x) {
   if (!x) return 'Loading experiment targets...';
   const hasLowRecovery = clips.filter(c => c.recovery === 'yes').length / Math.max(1, clips.length) < 0.15;
   const occl = x.occlusion === 'none' ? 'unobstructed' : `${x.occlusion}-occlusion`;
-  const recoveryNote = hasLowRecovery ? ' — if grasp fails, keep recording through the recovery attempt' : '';
-  return `Record a ${occl} pick attempt of a ${x.orientation} object in ${x.lighting} lighting on the ${x.environment}${recoveryNote}.`;
+  const recoveryNote = hasLowRecovery ? ' Record the retry too.' : '';
+  return `Test this grasp: ${titleCase(occl)} · ${titleCase(x.orientation)} object · ${titleCase(x.lighting)} light · ${titleCase(x.environment)}.${recoveryNote}`;
 }
 
 /* ==========================================================================
@@ -426,7 +487,6 @@ function renderAll() {
   renderCoverageMatrix();
   renderDatasetVault();
   renderWeightsStudio();
-  drawSpatialVisualizer();
 }
 
 function renderSpotlight() {
@@ -514,7 +574,6 @@ window.selectTargetCandidate = function(idx) {
     recommendation = rankedExperiments[idx];
     renderSpotlight();
     renderCandidateQueue();
-    drawSpatialVisualizer();
     toast(`Switched target to Rank #${String(idx + 1).padStart(2, '0')}`);
   }
 };
@@ -1990,14 +2049,28 @@ async function beginCapture() {
   capturedFrameCanvases = [];
   frameMetrics = [];
   updateKeyframeLiveStrip();
+  await enableOptionalImu();
 
+  if (!deviceCapabilities?.camera) {
+    toast('Camera capture is unavailable. You can upload a video instead.');
+    $('#recState').textContent = 'CAMERA UNAVAILABLE · UPLOAD VIDEO';
+    return;
+  }
   try {
     const constraints = {
       video: { facingMode: currentFacingMode, width: { ideal: 1280 } },
       audio: true
     };
-    stream = await navigator.mediaDevices.getUserMedia(constraints);
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      audioEnabled = stream.getAudioTracks().length > 0;
+    } catch (audioError) {
+      stream = await navigator.mediaDevices.getUserMedia({ video: constraints.video, audio: false });
+      audioEnabled = false;
+    }
     $('#preview').srcObject = stream;
+    const cameraFps = stream.getVideoTracks()[0]?.getSettings?.().frameRate;
+    if ($('#hudFps')) $('#hudFps').textContent = cameraFps ? String(Math.round(cameraFps)) : '—';
     $('#systemStatusText').textContent = visionModel
       ? `Camera + MobileNet Active · ${modelBackend.toUpperCase()}`
       : 'Camera Active · Model Fallback';
@@ -2009,6 +2082,20 @@ async function beginCapture() {
   }
 }
 
+async function enableOptionalImu() {
+  if (!deviceCapabilities?.imu) return;
+  try {
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const permission = await DeviceMotionEvent.requestPermission();
+      if (permission !== 'granted') return;
+    }
+    window.removeEventListener('devicemotion', collectMotionSample);
+    window.addEventListener('devicemotion', collectMotionSample, { passive: true });
+  } catch (error) {
+    console.info('Optional IMU unavailable:', error);
+  }
+}
+
 function endCamera() {
   if (stream) {
     stream.getTracks().forEach(t => t.stop());
@@ -2016,10 +2103,19 @@ function endCamera() {
   }
   clearInterval(ticker);
   clearInterval(sampleTicker);
+  recordingStartedAt = 0;
   seconds = 0;
-  $('#timer').textContent = '00:00';
+  $('#timer').textContent = `00:00 / ${formatDuration(taskProfile.maxDurationSeconds)}`;
   $('#recordBtn')?.classList.remove('recording');
   $('#recordingIndicator')?.classList.remove('recording');
+  $('#recordBtn')?.setAttribute('aria-label', 'Start recording');
+  const shutterLabel = $('.shutter-label');
+  if (shutterLabel) shutterLabel.textContent = `Tap to record · stop anytime · ${taskProfile.maxDurationSeconds}s maximum`;
+}
+
+function formatDuration(totalSeconds) {
+  const value = Math.max(0, Math.round(totalSeconds));
+  return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 }
 
 function sampleFrame() {
@@ -2031,17 +2127,8 @@ function sampleFrame() {
   canvas.height = 72;
 
   try {
-    if (video && video.videoWidth > 0) {
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    } else {
-      // Draw test video frame
-      ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#38bdf8';
-      ctx.beginPath();
-      ctx.arc(48 + Math.sin(Date.now() / 200) * 20, 36, 12, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    if (!video || video.videoWidth <= 0) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const snap = document.createElement('canvas');
     snap.width = canvas.width;
@@ -2154,12 +2241,14 @@ function updateKeyframeLiveStrip() {
   if (!container) return;
 
   if (!capturedFrameCanvases.length) {
-    container.innerHTML = '<div class="filmstrip-placeholder">Recording keyframes will buffer here every 500ms...</div>';
+    container.innerHTML = '<div class="filmstrip-placeholder">Keyframes will appear while recording.</div>';
     if (label) label.textContent = '0 Frames';
+    if ($('#hudKeyframes')) $('#hudKeyframes').textContent = '0';
     return;
   }
 
   if (label) label.textContent = `${capturedFrameCanvases.length} Frames Buffer`;
+  if ($('#hudKeyframes')) $('#hudKeyframes').textContent = String(capturedFrameCanvases.length);
 
   container.innerHTML = '';
   capturedFrameCanvases.forEach(c => {
@@ -2181,6 +2270,11 @@ function toggleRecording() {
     return;
   }
 
+  if (!stream) {
+    toast('Camera is unavailable. Use Upload to analyze an existing video.');
+    return;
+  }
+
   chunks = [];
   frameMetrics = [];
   capturedFrameCanvases = [];
@@ -2189,8 +2283,11 @@ function toggleRecording() {
   objectLabels = [];
   detectionFrames = [];
   detectionPromises = [];
+  imuSamples = [];
+  recordedDurationSeconds = 0;
+  recordingStartedAt = performance.now();
   sampleFrame();
-  sampleTicker = setInterval(sampleFrame, 500);
+  sampleTicker = setInterval(sampleFrame, CAPTURE_CONFIG.keyframeIntervalMs);
 
   if (stream) {
     try {
@@ -2207,12 +2304,16 @@ function toggleRecording() {
   $('#recordBtn')?.classList.add('recording');
   $('#recordingIndicator')?.classList.add('recording');
   $('#recState').textContent = 'RECORDING LIVE';
+  $('#recordBtn')?.setAttribute('aria-label', 'Stop recording');
+  const shutterLabel = $('.shutter-label');
+  if (shutterLabel) shutterLabel.textContent = 'STOP';
 
   seconds = 0;
   ticker = setInterval(() => {
     seconds++;
-    $('#timer').textContent = `00:${String(seconds).padStart(2, '0')}`;
-    if (seconds >= 8) {
+    recordedDurationSeconds = (performance.now() - recordingStartedAt) / 1000;
+    $('#timer').textContent = `${formatDuration(recordedDurationSeconds)} / ${formatDuration(taskProfile.maxDurationSeconds)}`;
+    if (recordedDurationSeconds >= taskProfile.maxDurationSeconds) {
       if (recorder && recorder.state === 'recording') recorder.stop();
       else finishRecording();
     }
@@ -2220,6 +2321,7 @@ function toggleRecording() {
 }
 
 async function finishRecording() {
+  recordedDurationSeconds = Math.min(taskProfile.maxDurationSeconds, Math.max(.1, (performance.now() - recordingStartedAt) / 1000));
   clearInterval(sampleTicker);
   clearInterval(ticker);
   sampleFrame();
@@ -2249,8 +2351,9 @@ async function analyzeUploadedVideo(file) {
     video.onloadedmetadata = resolve;
     video.onerror = reject;
   });
-  const duration = Math.min(video.duration || 1, 12);
-  const samples = Math.min(8, Math.max(3, Math.ceil(duration)));
+  const duration = video.duration || 1;
+  recordedDurationSeconds = video.duration || 0;
+  const samples = Math.min(CAPTURE_CONFIG.uploadedVideoSampleLimit, Math.max(3, Math.ceil(duration)));
   for (let i = 0; i < samples; i++) {
     video.currentTime = samples === 1 ? 0 : (duration * i / (samples - 1));
     await new Promise(resolve => video.onseeked = resolve);
@@ -2290,6 +2393,37 @@ function analyzeFrames() {
     recovery: motionPeaks >= 2 ? 'yes' : 'no'
   };
 
+  const strongestDetection = allDetections.sort((a, b) => b.confidence - a.confidence)[0];
+  proposedEvidence = {
+    object: {
+      measurement: strongestDetection ? `${strongestDetection.label} detected` : 'No known COCO class detected',
+      inference: strongestDetection?.label || 'unknown object',
+      confidence: strongestDetection?.confidence || 0
+    },
+    occlusion: {
+      measurement: allDetections.length ? `Largest detection occupies ${Math.round(largestArea * 100)}% of frame` : `Center texture ratio ${textureRatio.toFixed(2)}`,
+      inference: proposedTags.occlusion,
+      confidence: Math.min(.96, allDetections.length ? .58 + largestArea * .55 : .52 + Math.abs(textureRatio - .68) * .45)
+    },
+    lighting: {
+      measurement: `Mean luminance ${Math.round(meanLum)} / 255`,
+      inference: proposedTags.lighting,
+      confidence: Math.min(.97, .62 + Math.abs(meanLum - 122) / 255)
+    },
+    orientation: {
+      measurement: `Edge ratio ${(avg('gx') / Math.max(.1, avg('gy'))).toFixed(2)}`,
+      inference: proposedTags.orientation,
+      confidence: Math.min(.9, .55 + Math.abs(avg('gx') - avg('gy')) / Math.max(1, avg('gx') + avg('gy')))
+    },
+    outcome: {
+      measurement: `${motionPeaks} temporal motion inflection${motionPeaks === 1 ? '' : 's'}`,
+      inference: `likely ${proposedTags.result}`,
+      confidence: Math.min(.88, .52 + Math.abs((motions.at(-1) || 0) - motionMean) / Math.max(10, motionMean * 3))
+    }
+  };
+  proposedTask = taskProfile.task;
+  proposedObject = proposedEvidence.object.inference;
+
   $('#featLuminance').textContent = `${Math.round(meanLum)} / 255`;
   $('#featTexture').textContent = textureRatio.toFixed(2);
   $('#featGradient').textContent = `${(avg('gx') / Math.max(0.1, avg('gy'))).toFixed(2)}x`;
@@ -2298,8 +2432,8 @@ function analyzeFrames() {
   renderKeyframeGallery();
   renderTagEditor();
   const latestDetections = detectionFrames.at(-1)?.detections || [];
-  drawScene25D($('#scene25dCanvas'), latestDetections);
   $('#detectedObjectCount').textContent = `${latestDetections.length} object${latestDetections.length === 1 ? '' : 's'}`;
+  renderDetectionEvidence({ meanLum, textureRatio, motionPeaks });
 
   $('#processBar').style.width = '100%';
   setTimeout(() => {
@@ -2308,6 +2442,23 @@ function analyzeFrames() {
       : `${frames.length} KEYFRAMES · HEURISTIC FALLBACK`;
     $('#saveClip').disabled = false;
   }, 600);
+}
+
+function renderDetectionEvidence(metrics) {
+  const objectList = $('#detectionEvidenceList');
+  const tagList = $('#tagEvidenceList');
+  if (!objectList || !tagList) return;
+  const bestByLabel = new Map();
+  detectionFrames.flatMap(frame => frame.detections).forEach(detection => {
+    const current = bestByLabel.get(detection.label);
+    if (!current || detection.confidence > current.confidence) bestByLabel.set(detection.label, detection);
+  });
+  const objects = [...bestByLabel.values()].sort((a, b) => b.confidence - a.confidence).slice(0, 6);
+  objectList.innerHTML = objects.length
+    ? objects.map(d => `<span class="detected-object-chip"><b>${titleCase(d.label)}</b><small>${Math.round(d.confidence * 100)}%</small></span>`).join('')
+    : '<span class="evidence-empty">No known COCO object detected; visual features still produced reviewable tags.</span>';
+  const evidence = Object.entries(proposedEvidence);
+  tagList.innerHTML = evidence.map(([name, item]) => `<div class="tag-evidence-row"><span>${titleCase(name)}</span><b>${titleCase(item.inference)}</b><small>${item.measurement}</small><em>${Math.round(item.confidence * 100)}%</em></div>`).join('');
 }
 
 function renderKeyframeGallery() {
@@ -2346,7 +2497,15 @@ function renderTagEditor() {
   const editor = $('#tagEditor');
   if (!editor) return;
 
-  editor.innerHTML = Object.entries(SCHEMA).map(([key, options]) => `
+  editor.innerHTML = `
+    <div class="tag-field-group text-attribute-field">
+      <label class="tag-field-label" for="taskAttribute">TASK</label>
+      <input id="taskAttribute" value="${escapeHtml(proposedTask)}" placeholder="e.g. insertion, inspection, navigation">
+    </div>
+    <div class="tag-field-group text-attribute-field">
+      <label class="tag-field-label" for="objectAttribute">OBJECT</label>
+      <input id="objectAttribute" value="${escapeHtml(proposedObject)}" placeholder="Detected or operator-provided object">
+    </div>` + Object.entries(SCHEMA).map(([key, options]) => `
     <div class="tag-field-group">
       <span class="tag-field-label">${key.toUpperCase()}</span>
       <div class="tag-options-row">
@@ -2365,10 +2524,13 @@ function renderTagEditor() {
       renderTagEditor();
     };
   });
+  $('#taskAttribute')?.addEventListener('input', event => { proposedTask = event.target.value.trim() || taskProfile.task; });
+  $('#objectAttribute')?.addEventListener('input', event => { proposedObject = event.target.value.trim() || 'unknown object'; });
 }
 
 async function commitClip() {
   const beforeReadiness = calculateReadiness().total;
+  const beforeImpact = distributionSnapshot();
   const notes = $('#operatorNotes')?.value || '';
 
   const embedding = embeddingSamples.length
@@ -2379,8 +2541,20 @@ async function commitClip() {
     id: `live-${Date.now().toString(36).toUpperCase()}`,
     created: Date.now(),
     source: 'live',
+    durationSeconds: Number(recordedDurationSeconds.toFixed(2)),
+    sourceDevice: sourceDevice(),
+    task: proposedTask,
+    object: proposedObject,
     ...proposedTags,
     notes,
+    evidence: Object.entries(proposedEvidence).map(([attribute, item]) => ({ attribute, ...item })),
+    optionalMetadata: {
+      audio: { available: audioEnabled },
+      imu: { available: deviceCapabilities?.imu || false, samples: imuSamples },
+      gps: { available: deviceCapabilities?.gps || false, collected: false },
+      robotTelemetry: null,
+      external: {}
+    },
     embedding,
     model: {
       name: visionModel ? 'MobileNetV1 alpha-0.25' : 'heuristic-fallback',
@@ -2390,7 +2564,7 @@ async function commitClip() {
     },
     detections: detectionFrames.map(frame => ({
       at: frame.at,
-      objects: frame.detections.map(({ label, confidence, x, y, width, height, relativeDepth }) => ({ label, confidence, x, y, width, height, relativeDepth }))
+      objects: frame.detections.map(({ label, confidence, x, y, width, height }) => ({ label, confidence, x, y, width, height }))
     })),
     video: recordedBlob
   };
@@ -2402,11 +2576,36 @@ async function commitClip() {
   const afterReadiness = calculateReadiness().total;
   $('#oldCoverage').textContent = `${beforeReadiness}%`;
   $('#newCoverage').textContent = `${afterReadiness}%`;
+  renderImpactComparison(beforeImpact, distributionSnapshot());
 
   const recDetail = proposedTags.recovery === 'yes' ? ' with recovery attempt' : '';
-  $('#successCopy').textContent = `A demonstration with ${proposedTags.occlusion} occlusion, ${proposedTags.orientation} object, and ${proposedTags.lighting} lighting (${proposedTags.result.toUpperCase()}${recDetail}) was ingested into the physical AI repository. Deterministic rankings recomputed across all condition candidates.`;
+  $('#successCopy').textContent = `${formatDuration(recordedDurationSeconds)} demonstration saved: ${titleCase(proposedTags.occlusion)} occlusion · ${titleCase(proposedTags.lighting)} light · ${titleCase(proposedTags.result)}${recDetail}. Rankings were recalculated from the updated dataset.`;
 
   showView('successView');
+}
+
+function distributionSnapshot() {
+  const total = Math.max(1, clips.length);
+  const values = {};
+  Object.entries(SCHEMA).forEach(([attribute, options]) => options.forEach(value => {
+    values[`${attribute}:${value}`] = clips.filter(clip => clip[attribute] === value).length / total;
+  }));
+  return values;
+}
+
+function renderImpactComparison(before, after) {
+  const container = $('#impactComparison');
+  if (!container) return;
+  const focus = [
+    ['Occlusion', `occlusion:${proposedTags.occlusion}`],
+    ['Lighting', `lighting:${proposedTags.lighting}`],
+    ['Orientation', `orientation:${proposedTags.orientation}`],
+    ['Recovery', `recovery:${proposedTags.recovery}`]
+  ];
+  container.innerHTML = focus.map(([label, key]) => {
+    const from = Math.round((before[key] || 0) * 100), to = Math.round((after[key] || 0) * 100);
+    return `<div class="impact-row"><span>${label}</span><div class="impact-track"><i style="width:${from}%"></i><b style="width:${to}%"></b></div><em>${from}% → ${to}%</em></div>`;
+  }).join('');
 }
 
 /* ==========================================================================
@@ -2481,9 +2680,6 @@ function showView(viewId) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  if (viewId === 'homeView') {
-    drawSpatialVisualizer();
-  }
 }
 
 /* ==========================================================================
@@ -2654,9 +2850,9 @@ function initEventListeners() {
 
 // Launch
 document.addEventListener('DOMContentLoaded', () => {
+  deviceCapabilities = detectCapabilities();
   loadVisionModel();
   loadYoloModel();
   initEventListeners();
-  initSpatialVisualizer();
   loadDataset();
 });
