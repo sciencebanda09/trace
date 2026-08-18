@@ -1,10 +1,17 @@
-const CACHE = 'trace-v11-detection-fusion';
+const CACHE = 'trace-v13-aspect-ratio';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './yolo.js',
+  './core/schema.js',
+  './core/priority-engine.js',
+  './core/storage.js',
+  './core/evidence.js',
+  './core/capture.js',
+  './core/simulator.js',
+  './core/ui.js',
   './models/yolov8n.onnx',
   './manifest.webmanifest',
   './icon.svg'
