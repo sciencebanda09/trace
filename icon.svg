@@ -1,1 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="108" fill="#07110e"/><path d="M112 126h288M256 126v260" stroke="#baff5a" stroke-width="48" stroke-linecap="round"/><circle cx="256" cy="386" r="44" fill="#ff654f"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#141e2c"/>
+      <stop offset="100%" stop-color="#080c10"/>
+    </linearGradient>
+    <linearGradient id="emGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)" stroke="rgba(255,255,255,0.12)" stroke-width="8"/>
+  <polygon points="256 96 112 180 256 264 400 180 256 96" fill="none" stroke="url(#emGrad)" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="112 264 256 348 400 264" fill="none" stroke="#38bdf8" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+  <polyline points="112 348 256 432 400 348" fill="none" stroke="#94a3b8" stroke-width="28" stroke-linejoin="round" stroke-linecap="round"/>
+</svg>

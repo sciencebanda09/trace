@@ -1,19 +1,707 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#07110e"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><title>TRACE · Data Scout</title><link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg"><link rel="manifest" href="manifest.webmanifest"><link rel="stylesheet" href="styles.css"></head><body>
-<header><a class="brand" href="#">TR<span>▲</span>CE <small>DATA SCOUT</small></a><button id="resetBtn" class="iconBtn" aria-label="Reset demo">↻</button></header>
-<main>
- <section id="homeView" class="view active">
-  <div class="statusRow"><span class="liveDot"></span><span>FAILURE ANALYSIS ACTIVE</span><span id="modelStatus">LOCAL VISION READY</span></div>
-  <article class="hero">
-   <div class="eyebrow">NEXT BEST EXPERIMENT <span>01</span></div>
-   <h1 id="instruction"></h1><p id="rationale" class="lede"></p>
-   <div class="scoreStrip"><div><b id="failureScore">—</b><small>FAILURE SIGNAL</small></div><div><b id="gapScore">—</b><small>DATA GAP</small></div><div><b id="priorityScore">—</b><small>PRIORITY</small></div></div>
-   <button id="recordThis" class="primary">RECORD THIS <span>→</span></button>
-  </article>
-  <section class="warning"><div><small>DATASET READINESS</small><strong><span id="coverage">—</span>%</strong></div><p id="datasetSummary"></p></section>
-  <div class="sectionHead"><h2>Where it breaks</h2><button data-view="mapView">VIEW MAP</button></div><div id="failureCards" class="failureCards"></div>
- </section>
- <section id="mapView" class="view"><button class="back" data-view="homeView">← BACK</button><p class="eyebrow">FAILURE-WEIGHTED COVERAGE</p><h1>Patterns before gaps.</h1><p class="lede">Cells rise when failures cluster in conditions your demonstrations underrepresent.</p><div id="coverageMap" class="coverageMap"></div><h2>Logged failures</h2><div id="failureLog"></div></section>
- <section id="captureView" class="view capture"><button class="back" id="closeCapture">× CLOSE</button><div class="cameraFrame"><video id="preview" autoplay muted playsinline></video><canvas id="sample" hidden></canvas><div class="reticle"></div><div class="targetLabel"><small>TARGET EXPERIMENT</small><span id="captureTarget"></span></div></div><div class="captureControls"><span id="timer">00:00</span><button id="recordBtn" aria-label="Start recording"><i></i></button><span id="recState">READY</span></div></section>
- <section id="reviewView" class="view"><p class="eyebrow">ON-DEVICE AUTO-TAGGING</p><h1>The phone proposes.<br>You confirm.</h1><div class="processing"><span id="processState">ANALYZING KEYFRAMES</span><div><i id="processBar"></i></div></div><div id="tagEditor" class="tagEditor"></div><button id="saveClip" class="primary" disabled>CONFIRM & ADD TO DATASET <span>→</span></button><button id="discardClip" class="textBtn">Discard clip</button></section>
- <section id="successView" class="view success"><div class="pulse">✓</div><p class="eyebrow">LEARNING LOOP CLOSED</p><h1>New evidence added.</h1><p id="successCopy" class="lede"></p><div class="delta"><span>READINESS</span><b><s id="oldCoverage">—</s> → <em id="newCoverage">—</em></b></div><button class="primary" data-view="homeView">SEE NEXT EXPERIMENT <span>→</span></button></section>
-</main><nav><button class="navActive" data-view="homeView">⌁<span>NEXT</span></button><button data-view="mapView">▦<span>PATTERNS</span></button><button id="quickRecord">●<span>CAPTURE</span></button></nav><div id="toast"></div><script type="module" src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#080c10">
+  <meta name="description" content="TRACE - Next-Gen Physical-AI Demonstration Acquisition & Telemetry Engine">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>TRACE · Physical-AI Data Scout</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    
+    <!-- Top Global Navigation Header -->
+    <header class="app-header">
+      <div class="header-container">
+        
+        <!-- Brand & Health Status -->
+        <div class="header-left">
+          <a class="brand-link" href="#" id="brandLogo">
+            <div class="brand-glyph">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                <polyline points="2 17 12 22 22 17"></polyline>
+                <polyline points="2 12 12 17 22 12"></polyline>
+              </svg>
+            </div>
+            <div class="brand-meta">
+              <span class="brand-title">TRACE</span>
+              <span class="brand-badge">DATA SCOUT</span>
+            </div>
+          </a>
+
+          <div class="system-status-pill">
+            <span class="pulse-indicator"></span>
+            <span id="systemStatusText">Pipeline Active</span>
+          </div>
+        </div>
+
+        <!-- Center Navigation Tabs -->
+        <nav class="center-nav" aria-label="Main Navigation">
+          <button class="tab-btn active" data-view="homeView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+            <span>Next Experiment</span>
+          </button>
+          <button class="tab-btn" data-view="mapView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Coverage Matrix</span>
+          </button>
+          <button class="tab-btn" data-view="datasetView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+            <span>Demonstrations (<span id="tabClipCount">20</span>)</span>
+          </button>
+          <button class="tab-btn" data-view="weightsView">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+            <span>Engine Weights</span>
+          </button>
+        </nav>
+
+        <!-- Right Quick Actions -->
+        <div class="header-right">
+          <button id="quickRecordBtn" class="btn-glow" title="Launch Video Viewfinder">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+            <span>Record</span>
+          </button>
+
+          <div class="menu-anchor">
+            <button id="moreActionsBtn" class="btn-icon" aria-label="Menu" title="More options">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
+            </button>
+            <div id="moreMenu" class="dropdown-panel">
+              <button id="menuAddSynthetic" class="dropdown-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Simulate Ingestion</span>
+              </button>
+              <button id="menuExportJson" class="dropdown-item">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Export Dataset (.json)</span>
+              </button>
+              <div class="dropdown-separator"></div>
+              <button id="resetBtn" class="dropdown-item danger">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+                <span>Reset Seed Dataset</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dynamic Canvas -->
+    <main class="app-main">
+      
+      <!-- ================= VIEW 1: HOME / NEXT EXPERIMENT ================= -->
+      <section id="homeView" class="view active">
+        
+        <!-- Clean, Breathable Recommendation Showcase -->
+        <div class="spotlight-card">
+          
+          <div class="spotlight-header">
+            <div class="pill-group">
+              <span class="badge-priority">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                NEXT-BEST EXPERIMENT
+              </span>
+              <span class="badge-rank" id="activeRankBadge">RANK #01</span>
+            </div>
+            
+            <div class="readiness-compact">
+              <span class="readiness-label">Dataset Readiness:</span>
+              <b class="readiness-value"><span id="coverage">0</span>%</b>
+            </div>
+          </div>
+
+          <div class="spotlight-main-grid">
+            
+            <!-- Left: Human-Readable Instruction & Signals -->
+            <div class="spotlight-info">
+              <h1 id="instruction" class="spotlight-title">Computing optimal experiment...</h1>
+              <p id="rationale" class="spotlight-lede"></p>
+
+              <!-- Target Setup Visual Chips -->
+              <div class="target-badges-wrapper">
+                <span class="target-section-title">TARGET CONFIGURATION</span>
+                <div id="targetTagPills" class="target-badges-row"></div>
+              </div>
+
+              <!-- Key Scoring Signals (Clean, Spacious Cards) -->
+              <div class="signal-cards-row">
+                <div class="signal-card signal-rose">
+                  <div class="signal-top">
+                    <span class="signal-label">Failure Signal</span>
+                    <span id="failureScore" class="signal-number">—</span>
+                  </div>
+                  <div class="signal-bar-track">
+                    <div id="failureBar" class="signal-bar-fill fill-rose"></div>
+                  </div>
+                  <span class="signal-caption">Incident correlation</span>
+                </div>
+
+                <div class="signal-card signal-amber">
+                  <div class="signal-top">
+                    <span class="signal-label">Dataset Gap</span>
+                    <span id="gapScore" class="signal-number">—</span>
+                  </div>
+                  <div class="signal-bar-track">
+                    <div id="gapBar" class="signal-bar-fill fill-amber"></div>
+                  </div>
+                  <span class="signal-caption">Condition sparsity</span>
+                </div>
+
+                <div class="signal-card signal-emerald">
+                  <div class="signal-top">
+                    <span class="signal-label">Priority Index</span>
+                    <span id="priorityScore" class="signal-number">—</span>
+                  </div>
+                  <div class="signal-bar-track">
+                    <div id="priorityBar" class="signal-bar-fill fill-emerald"></div>
+                  </div>
+                  <span class="signal-caption">Deterministic score</span>
+                </div>
+              </div>
+
+              <!-- Main Hero Action Controls -->
+              <div class="spotlight-actions">
+                <button id="recordThis" class="btn-primary-large">
+                  <div class="btn-icon-circle">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                  </div>
+                  <div class="btn-text-block">
+                    <span class="btn-main-text">Record Demonstration</span>
+                    <span class="btn-sub-text">Launch camera & local vision scanner</span>
+                  </div>
+                  <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+
+                <button id="quickSimulateBtn" class="btn-glass" title="Simulate adding this demonstration">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                  <span>Quick Ingest</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Right: Interactive 2.5D Physical Scene Visualizer Preview -->
+            <div class="spotlight-visualizer">
+              <div class="visualizer-card">
+                <div class="visualizer-header">
+                  <span class="visualizer-title">SPATIAL SCENE PREVIEW</span>
+                  <span id="sceneStatusBadge" class="visualizer-badge">Interactive 2.5D View</span>
+                </div>
+                <div class="canvas-container">
+                  <canvas id="spatialCanvas" width="340" height="240"></canvas>
+                  <div class="spatial-hud-overlay">
+                    <span id="spatialOcclLabel" class="hud-tag">Occlusion: None</span>
+                    <span id="spatialOrientLabel" class="hud-tag">Orientation: Upright</span>
+                  </div>
+                </div>
+                <div class="visualizer-footer">
+                  <span>💡 Drag to rotate scene • Visualizes target physical setup</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Progressive Disclosure: Expandable Formula Inspector -->
+          <div class="disclosure-section">
+            <button id="toggleFormulaBtn" class="disclosure-trigger">
+              <div class="trigger-left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>Inspect Priority Formula & Mathematical Weights</span>
+              </div>
+              <svg id="disclosureArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+
+            <div id="formulaPanel" class="disclosure-content">
+              <div class="formula-details-box">
+                <div class="formula-math-line">
+                  <code>Priority(x) = ( α·Gap(x) + β·FailureOverlap(x) + γ·Novelty(x) ) / Cost(x)</code>
+                </div>
+                <div class="formula-breakdown-grid">
+                  <div class="breakdown-col">
+                    <span class="b-label">Failure Overlap (β = <span id="paramWeightFail">0.50</span>)</span>
+                    <p id="calcFailTrace" class="b-desc">—</p>
+                  </div>
+                  <div class="breakdown-col">
+                    <span class="b-label">Dataset Gap (α = <span id="paramWeightGap">0.30</span>)</span>
+                    <p id="calcGapTrace" class="b-desc">—</p>
+                  </div>
+                  <div class="breakdown-col">
+                    <span class="b-label">Physical Cost (Divisor = <span id="calcCostTrace">1.00x</span>)</span>
+                    <p class="b-desc">Normalized acquisition difficulty for occlusion, lighting, and inverted angles.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Lower Section: Runner-Up Alternatives & Recent Breakdowns -->
+        <div class="lower-grid">
+          
+          <!-- Alternative Candidate Queue -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Alternative Candidate Queue</h2>
+                <span class="panel-subtitle">Select any experiment to switch active focus</span>
+              </div>
+              <button class="btn-ghost btn-sm" data-view="mapView">View All Matrix Cells →</button>
+            </div>
+            <div id="runnerUpList" class="runner-up-stream"></div>
+          </div>
+
+          <!-- Active Failure Clusters Diagnostic -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Recent Robot Breakdowns</h2>
+                <span class="panel-subtitle">Logged failure incidents driving priority</span>
+              </div>
+              <button class="btn-ghost btn-sm" data-view="datasetView">All Incidents →</button>
+            </div>
+            <div id="failureCards" class="failure-stream"></div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ================= VIEW 2: COVERAGE & FAILURE MATRIX ================= -->
+      <section id="mapView" class="view">
+        <div class="section-title-bar">
+          <div>
+            <span class="section-eyebrow">DATASET DIVERSITY & FAILURE CORRELATION</span>
+            <h1 class="section-heading">Multi-Dimensional Coverage Matrix</h1>
+            <p class="section-desc">
+              Explore representation across every attribute dimension. Cells dynamically update as demonstrations are added.
+            </p>
+          </div>
+          <div class="view-switch-btns">
+            <button class="btn-glass btn-sm" data-view="homeView">← Back to Queue</button>
+          </div>
+        </div>
+
+        <div class="matrix-layout-grid">
+          
+          <!-- Category Dimension Breakdown Bars -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Dimension Distributions</h2>
+                <span class="panel-subtitle">Success demonstrations vs logged failure counts</span>
+              </div>
+              <div class="legend-pills">
+                <span class="legend-pill"><span class="dot emerald"></span> Success</span>
+                <span class="legend-pill"><span class="dot rose"></span> Failure</span>
+              </div>
+            </div>
+            <div id="coverageMap" class="dimension-stream"></div>
+          </div>
+
+          <!-- Permutation Cell Explorer -->
+          <div class="glass-panel">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Permutation Explorer</h2>
+                <span class="panel-subtitle">Filter condition space permutations</span>
+              </div>
+              <div class="filter-chip-group">
+                <button class="chip-btn active" data-matrix-filter="all">All</button>
+                <button class="chip-btn" data-matrix-filter="gap">Gaps (0 Demos)</button>
+                <button class="chip-btn" data-matrix-filter="failures">Has Failures</button>
+              </div>
+            </div>
+            <div id="permutationGrid" class="matrix-heatmap-grid"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 3: DEMONSTRATION VAULT ================= -->
+      <section id="datasetView" class="view">
+        <div class="section-title-bar">
+          <div>
+            <span class="section-eyebrow">PERSISTENT INDEXEDDB STORE</span>
+            <h1 class="section-heading">Demonstration Dataset Vault</h1>
+            <p class="section-desc">
+              Search, filter, and inspect all recorded demonstrations. Telemetry and keyframe evidence stored on-device.
+            </p>
+          </div>
+          <div class="view-actions-row">
+            <button id="vaultAddSynthetic" class="btn-glass btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              <span>Simulate Ingest</span>
+            </button>
+            <button id="vaultExportJson" class="btn-glass btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Export JSON</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter & Search Toolbar -->
+        <div class="vault-filter-bar">
+          <div class="search-input-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <input type="text" id="datasetSearch" placeholder="Search demonstrations by tag, condition, or ID..." aria-label="Search dataset">
+          </div>
+          <div class="filter-pill-row">
+            <button class="pill-filter-btn active" data-filter="all">All (<span id="countAll">0</span>)</button>
+            <button class="pill-filter-btn" data-filter="failures">Failures (<span id="countFailures">0</span>)</button>
+            <button class="pill-filter-btn" data-filter="recovery">With Recovery (<span id="countRecovery">0</span>)</button>
+            <button class="pill-filter-btn" data-filter="live">Operator Captured (<span id="countLive">0</span>)</button>
+          </div>
+        </div>
+
+        <!-- Clean Dataset Table -->
+        <div class="table-card">
+          <div class="table-scroll-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>ID & SOURCE</th>
+                  <th>OCCLUSION</th>
+                  <th>LIGHTING</th>
+                  <th>ORIENTATION</th>
+                  <th>SURFACE</th>
+                  <th>RESULT</th>
+                  <th>RECOVERY</th>
+                  <th>TIMESTAMP</th>
+                  <th class="align-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="datasetTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= VIEW 4: ENGINE WEIGHTS STUDIO ================= -->
+      <section id="weightsView" class="view">
+        <div class="section-title-bar">
+          <div>
+            <span class="section-eyebrow">CUSTOM ALGORITHM TUNER</span>
+            <h1 class="section-heading">Deterministic Ranking Weights</h1>
+            <p class="section-desc">
+              Adjust prioritization weights in real-time. Nothing is hardcoded; the priority engine recalculates dynamically.
+            </p>
+          </div>
+          <button id="resetWeightsBtn" class="btn-glass btn-sm">Reset to Defaults</button>
+        </div>
+
+        <div class="weights-studio-grid">
+          
+          <div class="glass-panel weights-sliders-card">
+            <h2 class="panel-title mb-4">Algorithm Parameters</h2>
+            
+            <!-- Failure Correlation Slider -->
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <div>
+                  <span class="slider-name">Failure Correlation Weight (β)</span>
+                  <span class="slider-sub">Pushes priority toward conditions where robot attempts have failed</span>
+                </div>
+                <b class="slider-val" id="valWeightFail">0.50</b>
+              </div>
+              <input type="range" id="sliderWeightFail" min="0" max="1" step="0.05" value="0.50" class="custom-slider">
+            </div>
+
+            <!-- Gap Sparsity Slider -->
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <div>
+                  <span class="slider-name">Dataset Gap Weight (α)</span>
+                  <span class="slider-sub">Favors empty or underrepresented cells in the condition space</span>
+                </div>
+                <b class="slider-val" id="valWeightGap">0.30</b>
+              </div>
+              <input type="range" id="sliderWeightGap" min="0" max="1" step="0.05" value="0.30" class="custom-slider">
+            </div>
+
+            <!-- Novelty Signal Slider -->
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <div>
+                  <span class="slider-name">Novelty Signal Weight (γ)</span>
+                  <span class="slider-sub">Exploration bonus for novel condition transitions</span>
+                </div>
+                <b class="slider-val" id="valWeightNov">0.20</b>
+              </div>
+              <input type="range" id="sliderWeightNov" min="0" max="1" step="0.05" value="0.20" class="custom-slider">
+            </div>
+
+            <!-- Cost Multiplier Sensitivity Slider -->
+            <div class="slider-control-group">
+              <div class="slider-header">
+                <div>
+                  <span class="slider-name">Physical Cost Sensitivity</span>
+                  <span class="slider-sub">Penalizes complex physical setups (e.g. inverted objects, heavy occlusion)</span>
+                </div>
+                <b class="slider-val" id="valWeightCost">1.00x</b>
+              </div>
+              <input type="range" id="sliderWeightCost" min="0.2" max="2.0" step="0.1" value="1.00" class="custom-slider">
+            </div>
+
+            <!-- Preset Buttons -->
+            <div class="preset-buttons-row">
+              <span class="preset-label">QUICK PRESETS:</span>
+              <button class="chip-btn" id="presetFailure">Failure-Driven (Default)</button>
+              <button class="chip-btn" id="presetExploration">Pure Exploration</button>
+              <button class="chip-btn" id="presetLowCost">Fast Low-Cost Batch</button>
+            </div>
+          </div>
+
+          <!-- Live Impact Preview Card -->
+          <div class="glass-panel weights-impact-card">
+            <h2 class="panel-title">Live Re-Ranking Impact</h2>
+            <p class="panel-subtitle mb-4">Top 3 experiments with current weight configuration:</p>
+            <div id="liveRankingPreview" class="live-ranking-stream"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 5: CAPTURE STUDIO ================= -->
+      <section id="captureView" class="view capture-mode">
+        <div class="capture-wrapper">
+          
+          <!-- Viewfinder Header HUD -->
+          <div class="viewfinder-header">
+            <button class="btn-glass btn-sm" id="closeCapture">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <span>Exit Viewfinder</span>
+            </button>
+            <div class="viewfinder-status-badge">
+              <span id="recordingIndicator" class="status-dot"></span>
+              <span id="recState">STANDBY · READY</span>
+            </div>
+            <div class="timer-tag" id="timer">00:00</div>
+          </div>
+
+          <!-- Video Viewport Frame -->
+          <div class="viewfinder-viewport">
+            <video id="preview" autoplay muted playsinline></video>
+            <canvas id="sample" hidden></canvas>
+            
+            <!-- AR Reticle HUD Overlay -->
+            <div class="ar-hud">
+              <div class="hud-corner tl"></div>
+              <div class="hud-corner tr"></div>
+              <div class="hud-corner bl"></div>
+              <div class="hud-corner br"></div>
+              <div class="center-crosshair"></div>
+            </div>
+
+            <!-- Target Instruction HUD Floating Pill -->
+            <div class="hud-target-banner">
+              <div class="hud-target-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                <span>TARGET DEMONSTRATION EXPERIMENT</span>
+              </div>
+              <p id="captureTarget" class="hud-target-text">Loading target...</p>
+            </div>
+
+            <!-- Real-Time CV Telemetry Meters -->
+            <div class="hud-telemetry-box">
+              <div class="hud-meter"><span class="meter-lbl">LUM</span><span id="hudLuminance" class="meter-val">--</span></div>
+              <div class="hud-meter"><span class="meter-lbl">MOT</span><span id="hudMotion" class="meter-val">--</span></div>
+              <div class="hud-meter"><span class="meter-lbl">FPS</span><span id="hudFps" class="meter-val">30</span></div>
+            </div>
+          </div>
+
+          <!-- Live Keyframe Buffer Filmstrip -->
+          <div class="keyframe-filmstrip-card">
+            <div class="filmstrip-header">
+              <span>REAL-TIME KEYFRAME BUFFER</span>
+              <span id="keyframeCountLabel">0 Frames</span>
+            </div>
+            <div id="keyframeLiveStrip" class="filmstrip-scroll">
+              <div class="filmstrip-placeholder">Recording keyframes will buffer here every 500ms...</div>
+            </div>
+          </div>
+
+          <!-- Bottom Viewfinder Controls -->
+          <div class="viewfinder-footer">
+            <div class="footer-left">
+              <button id="switchCameraBtn" class="btn-icon-glass" title="Flip Camera">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0-4.418-3.582-8-8-8s-8 3.582-8 8c0 2.21.896 4.21 2.344 5.656l-1.637 1.637L10 18v-5.293L8.354 14.354A5.98 5.98 0 0 1 6 10c0-3.314 2.686-6 6-6s6 2.686 6 6c0 1.657-.672 3.157-1.757 4.243l1.414 1.414A7.963 7.963 0 0 0 20 10z"></path></svg>
+              </button>
+            </div>
+            
+            <div class="shutter-col">
+              <button id="recordBtn" class="shutter-btn" aria-label="Record demonstration">
+                <div class="shutter-core"></div>
+              </button>
+              <span class="shutter-label">Tap to capture (max 8s)</span>
+            </div>
+
+            <div class="footer-right">
+              <label class="btn-glass btn-sm upload-label" title="Upload video file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                <span>Upload</span>
+                <input type="file" id="videoFileInput" accept="video/*" hidden>
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 6: KEYFRAME REVIEW & VERIFICATION ================= -->
+      <section id="reviewView" class="view">
+        <div class="review-wrapper">
+          
+          <div class="section-title-bar">
+            <div>
+              <span class="section-eyebrow">ON-DEVICE AUTO-TAGGING</span>
+              <h1 class="section-heading">Keyframe Analysis & Verification</h1>
+              <p class="section-desc">
+                Local vision heuristics analyzed keyframes. Confirm or adjust proposed attributes before ingestion.
+              </p>
+            </div>
+          </div>
+
+          <!-- Computer Vision Feature Diagnostics -->
+          <div class="glass-panel cv-diagnostics-card">
+            <div class="cv-top">
+              <div class="cv-status">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                <span id="processState">ANALYZING SAMPLED FRAMES...</span>
+              </div>
+              <span class="cv-meta">Luminance • Texture Variance • Motion Spikes</span>
+            </div>
+            <div class="cv-progress-bar">
+              <div id="processBar" class="cv-progress-fill"></div>
+            </div>
+
+            <div class="cv-metrics-row">
+              <div class="cv-metric-box">
+                <span class="m-title">Luminance (L_avg)</span>
+                <b id="featLuminance" class="m-val">—</b>
+              </div>
+              <div class="cv-metric-box">
+                <span class="m-title">Texture Variance Ratio</span>
+                <b id="featTexture" class="m-val">—</b>
+              </div>
+              <div class="cv-metric-box">
+                <span class="m-title">Gradient Ratio (Gx/Gy)</span>
+                <b id="featGradient" class="m-val">—</b>
+              </div>
+              <div class="cv-metric-box">
+                <span class="m-title">Motion Inflections</span>
+                <b id="featMotion" class="m-val">—</b>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visual Sampled Keyframe Gallery -->
+          <div class="glass-panel keyframe-gallery-card">
+            <h2 class="panel-title mb-3">Sampled Video Keyframes</h2>
+            <div id="sampledKeyframeGallery" class="gallery-scroll-strip"></div>
+          </div>
+
+          <!-- Dynamic Tag Editor Chips -->
+          <div class="glass-panel tag-editor-card">
+            <div class="panel-header">
+              <div>
+                <h2 class="panel-title">Demonstration Attributes</h2>
+                <span class="panel-subtitle">Select or adjust any proposed tag to calibrate dataset accuracy</span>
+              </div>
+            </div>
+            <div id="tagEditor" class="tag-groups-grid"></div>
+
+            <div class="operator-notes-wrap">
+              <label for="operatorNotes">OPERATOR TELEMETRY NOTES (OPTIONAL)</label>
+              <input type="text" id="operatorNotes" placeholder="e.g. Compliant gripper slip observed at 00:04, recovered on second attempt" />
+            </div>
+
+            <div class="review-button-row">
+              <button id="saveClip" class="btn-primary-large" disabled>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>CONFIRM & INGEST EVIDENCE</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              </button>
+              <button id="discardClip" class="btn-glass">Discard Clip & Re-record</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ================= VIEW 7: SUCCESS & CONFIRMATION ================= -->
+      <section id="successView" class="view success-mode">
+        <div class="success-dialog-card">
+          <div class="success-icon-badge">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <span class="section-eyebrow">LEARNING LOOP CLOSED</span>
+          <h1 class="success-heading">Demonstration Ingested</h1>
+          <p id="successCopy" class="success-body"></p>
+
+          <div class="readiness-delta-box">
+            <span class="delta-title">DATASET READINESS DELTA</span>
+            <div class="delta-values-row">
+              <s id="oldCoverage" class="val-prev">—</s>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+              <span id="newCoverage" class="val-curr">—</span>
+            </div>
+          </div>
+
+          <div class="success-btn-row">
+            <button class="btn-primary-large" data-view="homeView">
+              <span>EXPLORE RE-RANKED NEXT EXPERIMENT</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </button>
+            <button class="btn-glass" data-view="mapView">View Updated Coverage</button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+      <button class="mobile-tab-btn active" data-view="homeView">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+        <span>Next</span>
+      </button>
+      <button class="mobile-tab-btn" data-view="mapView">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        <span>Matrix</span>
+      </button>
+      <button id="quickRecordMobile" class="mobile-shutter-action">
+        <div class="mobile-shutter-circle">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+        </div>
+      </button>
+      <button class="mobile-tab-btn" data-view="datasetView">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+        <span>Vault</span>
+      </button>
+      <button class="mobile-tab-btn" data-view="weightsView">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+        <span>Weights</span>
+      </button>
+    </nav>
+
+    <!-- Global Toast Notification System -->
+    <div id="toast" class="toast-popup" role="alert" aria-live="polite"></div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
