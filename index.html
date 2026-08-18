@@ -102,6 +102,9 @@
       
       <!-- ================= VIEW 1: HOME / NEXT EXPERIMENT ================= -->
       <section id="homeView" class="view active">
+        <div class="mobile-flow-guide" aria-label="TRACE workflow">
+          <span class="active">1 · Review</span><i></i><span>2 · Record</span><i></i><span>3 · Confirm</span>
+        </div>
         
         <!-- Clean, Breathable Recommendation Showcase -->
         <div class="spotlight-card">
@@ -186,6 +189,10 @@
                 <button id="quickSimulateBtn" class="btn-glass" title="Simulate adding this demonstration">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                   <span>Quick Ingest</span>
+                </button>
+                <button id="mobilePreviewBtn" class="btn-glass mobile-preview-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                  <span>Preview setup</span>
                 </button>
               </div>
             </div>
@@ -570,12 +577,13 @@
       <!-- ================= VIEW 5: CAPTURE STUDIO ================= -->
       <section id="captureView" class="view capture-mode">
         <div class="capture-wrapper">
+          <div class="capture-step-label">STEP 2 OF 3 · RECORD THE RECOMMENDED ACTION</div>
           
           <!-- Viewfinder Header HUD -->
           <div class="viewfinder-header">
             <button class="btn-glass btn-sm" id="closeCapture">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-              <span>Exit Viewfinder</span>
+                <span>Exit</span>
             </button>
             <div class="viewfinder-status-badge">
               <span id="recordingIndicator" class="status-dot"></span>
@@ -602,7 +610,7 @@
             <div class="hud-target-banner">
               <div class="hud-target-title">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                <span>TARGET DEMONSTRATION EXPERIMENT</span>
+                <span>WHAT TO RECORD</span>
               </div>
               <p id="captureTarget" class="hud-target-text">Loading target...</p>
             </div>
@@ -638,7 +646,7 @@
               <button id="recordBtn" class="shutter-btn" aria-label="Record demonstration">
                 <div class="shutter-core"></div>
               </button>
-              <span class="shutter-label">Tap to capture (max 8s)</span>
+              <span class="shutter-label">Tap once to start · auto-stops at 8s</span>
             </div>
 
             <div class="footer-right">
@@ -656,16 +664,19 @@
       <!-- ================= VIEW 6: KEYFRAME REVIEW & VERIFICATION ================= -->
       <section id="reviewView" class="view">
         <div class="review-wrapper">
+          <div class="mobile-flow-guide review-flow" aria-label="TRACE workflow">
+            <span>1 · Review</span><i></i><span>2 · Record</span><i></i><span class="active">3 · Confirm</span>
+          </div>
           
           <div class="section-title-bar">
             <div>
               <span class="section-eyebrow">ON-DEVICE AUTO-TAGGING</span>
-              <h1 class="section-heading">Keyframe Analysis & Verification</h1>
-              <p class="section-desc">
-                Local vision heuristics analyzed keyframes. Confirm or adjust proposed attributes before ingestion.
-              </p>
+              <h1 class="section-heading">Confirm the proposed tags</h1>
+              <p class="section-desc">The phone proposed these tags. Correct anything wrong, then save.</p>
             </div>
           </div>
+
+          <button id="toggleDiagnostics" class="btn-glass diagnostics-toggle" aria-expanded="false">Show technical analysis</button>
 
           <!-- Computer Vision Feature Diagnostics -->
           <div class="glass-panel cv-diagnostics-card">
@@ -717,14 +728,14 @@
             <div id="tagEditor" class="tag-groups-grid"></div>
 
             <div class="operator-notes-wrap">
-              <label for="operatorNotes">OPERATOR TELEMETRY NOTES (OPTIONAL)</label>
-              <input type="text" id="operatorNotes" placeholder="e.g. Compliant gripper slip observed at 00:04, recovered on second attempt" />
+              <label for="operatorNotes">NOTES (OPTIONAL)</label>
+              <input type="text" id="operatorNotes" placeholder="What happened during the attempt?" />
             </div>
 
             <div class="review-button-row">
               <button id="saveClip" class="btn-primary-large" disabled>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                <span>CONFIRM & INGEST EVIDENCE</span>
+                <span>CONFIRM & SAVE</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
               </button>
               <button id="discardClip" class="btn-glass">Discard Clip & Re-record</button>
@@ -812,6 +823,10 @@
           </div>
           <button id="closeSpatialModal" class="btn-icon" aria-label="Close Inspector">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          <button id="fullscreenSimulationBtn" class="btn-glass btn-sm" aria-pressed="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            <span>Full screen</span>
           </button>
         </div>
 

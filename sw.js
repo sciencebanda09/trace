@@ -1,4 +1,4 @@
-const CACHE = 'trace-v4-adaptive-ui';
+const CACHE = 'trace-v5-guided-mobile';
 const ASSETS = [
   './',
   './index.html',

@@ -422,7 +422,7 @@ function renderSpotlight() {
     ['occlusion', 'lighting', 'orientation', 'environment'].filter(k => f[k] === recommendation[k]).length >= 2
   ).length;
 
-  $('#rationale').textContent = `${matching} of ${failures.length} logged robot breakdowns overlap this exact operational profile. Dataset contains ${recommendation.count} demonstration${recommendation.count === 1 ? '' : 's'} (${pct(recommendation.gap)} sparsity).`;
+  $('#rationale').textContent = `${matching}/${failures.length} failures match these conditions · ${recommendation.count} existing examples.`;
 
   // Signal Metrics
   $('#failureScore').textContent = pct(recommendation.failure);
@@ -1138,12 +1138,38 @@ function initSpatialVisualizer() {
   }
 
   $('#spatialExpandBtn')?.addEventListener('click', openSpatialModal);
+  $('#mobilePreviewBtn')?.addEventListener('click', openSpatialModal);
   $('#closeSpatialModal')?.addEventListener('click', closeSpatialModal);
   $('#spatialModalBackdrop')?.addEventListener('click', closeSpatialModal);
 
   $('#modalRecordBtn')?.addEventListener('click', () => {
     closeSpatialModal();
     beginCapture();
+  });
+
+  $('#fullscreenSimulationBtn')?.addEventListener('click', async () => {
+    const modal = $('#spatialInspectorModal');
+    const button = $('#fullscreenSimulationBtn');
+    const entering = !modal?.classList.contains('simulation-focus');
+    modal?.classList.toggle('simulation-focus', entering);
+    button?.setAttribute('aria-pressed', String(entering));
+    const label = button?.querySelector('span');
+    if (label) label.textContent = entering ? 'Show details' : 'Full screen';
+    try {
+      if (entering && modal?.requestFullscreen && !document.fullscreenElement) await modal.requestFullscreen();
+      if (!entering && document.fullscreenElement) await document.exitFullscreen();
+    } catch (error) {
+      console.info('Browser fullscreen unavailable; using in-app fullscreen.', error);
+    }
+  });
+
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) {
+      $('#spatialInspectorModal')?.classList.remove('simulation-focus');
+      $('#fullscreenSimulationBtn')?.setAttribute('aria-pressed', 'false');
+      const label = $('#fullscreenSimulationBtn span');
+      if (label) label.textContent = 'Full screen';
+    }
   });
 
   // Keyboard Shortcuts
@@ -2370,6 +2396,8 @@ function showView(viewId) {
   const menu = $('#moreMenu');
   if (menu) menu.classList.remove('show');
 
+  document.body.classList.toggle('capture-focus', viewId === 'captureView');
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   if (viewId === 'homeView') {
@@ -2391,6 +2419,15 @@ function initEventListeners() {
   $('#quickRecordMobile')?.addEventListener('click', beginCapture);
   $('#recordThis')?.addEventListener('click', beginCapture);
   $('#quickSimulateBtn')?.addEventListener('click', injectSyntheticDemo);
+
+  $('#toggleDiagnostics')?.addEventListener('click', () => {
+    const wrapper = $('.review-wrapper');
+    const button = $('#toggleDiagnostics');
+    const expanded = !wrapper?.classList.contains('show-diagnostics');
+    wrapper?.classList.toggle('show-diagnostics', expanded);
+    button?.setAttribute('aria-expanded', String(expanded));
+    if (button) button.textContent = expanded ? 'Hide technical analysis' : 'Show technical analysis';
+  });
 
   // Viewfinder actions
   $('#closeCapture')?.addEventListener('click', () => {

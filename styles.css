@@ -3277,3 +3277,273 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Guided phone flow: one decision per screen. */
+.mobile-flow-guide,
+.mobile-preview-btn,
+.capture-step-label,
+.diagnostics-toggle {
+  display: none;
+}
+
+@media (max-width: 899px) {
+  .mobile-flow-guide {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: var(--ink-dim);
+    font: 600 10px/1.2 'JetBrains Mono', monospace;
+    letter-spacing: .04em;
+  }
+
+  .mobile-flow-guide span { white-space: nowrap; }
+  .mobile-flow-guide span.active { color: var(--emerald-light); }
+  .mobile-flow-guide i { height: 1px; flex: 1; background: var(--border-card); }
+  .review-flow { margin-bottom: 18px; }
+
+  .mobile-preview-btn,
+  .diagnostics-toggle {
+    display: inline-flex;
+  }
+
+  .spotlight-visualizer {
+    display: none;
+  }
+
+  .spotlight-title {
+    margin-bottom: 8px;
+  }
+
+  .spotlight-lede {
+    margin-bottom: 14px;
+    color: var(--ink-secondary);
+  }
+
+  .target-section-title,
+  .signal-caption,
+  .btn-sub-text,
+  .candidate-queue-section,
+  .recent-failures-section {
+    display: none !important;
+  }
+
+  .signal-cards-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 6px;
+  }
+
+  .signal-card {
+    padding: 10px 8px;
+  }
+
+  .signal-top {
+    display: block;
+  }
+
+  .signal-label {
+    display: block;
+    font-size: 8px;
+    margin-bottom: 3px;
+  }
+
+  .signal-number {
+    font-size: 16px;
+  }
+
+  .spotlight-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  #recordThis {
+    grid-column: 1 / -1;
+  }
+
+  #quickSimulateBtn {
+    display: none;
+  }
+
+  body.capture-focus {
+    padding-bottom: 0;
+    overflow: hidden;
+  }
+
+  body.capture-focus .app-header,
+  body.capture-focus .mobile-bottom-nav {
+    display: none;
+  }
+
+  body.capture-focus .app-main {
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    padding: 0;
+  }
+
+  body.capture-focus #captureView {
+    height: 100dvh;
+    padding: 0;
+  }
+
+  body.capture-focus .capture-wrapper {
+    height: 100dvh;
+    min-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    background: #000;
+  }
+
+  .capture-step-label {
+    display: block;
+    position: absolute;
+    top: calc(var(--safe-top) + 15px);
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    width: max-content;
+    max-width: 56vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(255,255,255,.72);
+    font: 600 8px 'JetBrains Mono', monospace;
+  }
+
+  .viewfinder-header {
+    position: absolute;
+    inset: var(--safe-top) 0 auto;
+    z-index: 18;
+    padding: 10px 12px;
+    background: linear-gradient(to bottom, rgba(0,0,0,.72), transparent);
+  }
+
+  .viewfinder-status-badge {
+    display: none;
+  }
+
+  .viewfinder-viewport {
+    grid-row: 1 / -1;
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    aspect-ratio: auto;
+    border-radius: 0;
+  }
+
+  .hud-target-banner {
+    top: calc(var(--safe-top) + 64px);
+    bottom: auto;
+    left: 12px;
+    right: 12px;
+    padding: 10px 12px;
+  }
+
+  .hud-target-title {
+    margin-bottom: 3px;
+  }
+
+  .hud-target-text {
+    font-size: 12px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .hud-telemetry-box,
+  .keyframe-filmstrip-card {
+    display: none;
+  }
+
+  .viewfinder-footer {
+    position: absolute;
+    z-index: 18;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 16px 18px calc(16px + var(--safe-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,.88), transparent);
+  }
+
+  .shutter-label {
+    font-size: 9px;
+    color: rgba(255,255,255,.8);
+  }
+
+  .review-wrapper .cv-diagnostics-card,
+  .review-wrapper .keyframe-gallery-card {
+    display: none;
+  }
+
+  .review-wrapper.show-diagnostics .cv-diagnostics-card,
+  .review-wrapper.show-diagnostics .keyframe-gallery-card {
+    display: block;
+  }
+
+  .diagnostics-toggle {
+    margin-bottom: 12px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .section-title-bar {
+    margin-bottom: 12px;
+  }
+
+  .section-heading {
+    font-size: clamp(22px, 6.5vw, 30px);
+  }
+
+  .section-desc {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .tag-editor-card {
+    padding: 14px;
+  }
+
+  .tag-editor-card .panel-subtitle {
+    display: none;
+  }
+
+  .spatial-modal.simulation-focus .spatial-modal-header {
+    position: absolute;
+    inset: var(--safe-top) 0 auto;
+    z-index: 15;
+    background: linear-gradient(to bottom, rgba(0,0,0,.8), transparent);
+  }
+
+  .spatial-modal.simulation-focus .modal-title-group,
+  .spatial-modal.simulation-focus .modal-telemetry-column,
+  .spatial-modal.simulation-focus #modalRecordBtn {
+    display: none;
+  }
+
+  .spatial-modal.simulation-focus .spatial-modal-body,
+  .spatial-modal.simulation-focus .modal-canvas-column,
+  .spatial-modal.simulation-focus .modal-canvas-frame {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .spatial-modal.simulation-focus #spatialModalCanvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .spatial-modal.simulation-focus .modal-canvas-hud {
+    padding-top: calc(var(--safe-top) + 58px);
+  }
+}
