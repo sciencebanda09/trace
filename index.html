@@ -595,6 +595,7 @@
           <!-- Video Viewport Frame -->
           <div class="viewfinder-viewport">
             <video id="preview" autoplay muted playsinline></video>
+            <canvas id="detectionOverlay" class="detection-overlay" aria-hidden="true"></canvas>
             <canvas id="sample" hidden></canvas>
             
             <!-- AR Reticle HUD Overlay -->
@@ -621,6 +622,7 @@
               <div class="hud-meter"><span class="meter-lbl">MOT</span><span id="hudMotion" class="meter-val">--</span></div>
               <div class="hud-meter"><span class="meter-lbl">FPS</span><span id="hudFps" class="meter-val">30</span></div>
             </div>
+            <div id="yoloLiveStatus" class="yolo-live-status">YOLO · LOADING</div>
           </div>
 
           <!-- Live Keyframe Buffer Filmstrip -->
@@ -677,6 +679,15 @@
           </div>
 
           <button id="toggleDiagnostics" class="btn-glass diagnostics-toggle" aria-expanded="false">Show technical analysis</button>
+
+          <div class="glass-panel scene25d-card">
+            <div class="panel-header">
+              <div><h2 class="panel-title">Detected scene</h2><span class="panel-subtitle">YOLO objects projected into relative 2.5D depth</span></div>
+              <span id="detectedObjectCount" class="visualizer-badge">0 objects</span>
+            </div>
+            <canvas id="scene25dCanvas" class="scene25d-canvas"></canvas>
+            <p class="scene25d-note">Relative depth is estimated from tracked box scale; it is not metric 3D reconstruction.</p>
+          </div>
 
           <!-- Computer Vision Feature Diagnostics -->
           <div class="glass-panel cv-diagnostics-card">
@@ -906,6 +917,7 @@
     <div id="toast" class="toast-popup" role="alert" aria-live="polite"></div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1/dist/mobilenet.min.js" crossorigin="anonymous"></script>
   <script type="module" src="app.js"></script>

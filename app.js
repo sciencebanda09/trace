@@ -2,6 +2,7 @@
  * TRACE · Physical-AI Demonstration Acquisition Engine
  * Dynamic deterministic priority scoring, interactive 2.5D visualizer, and telemetry pipeline.
  */
+import { initYolo, detectObjects, drawDetections, drawScene25D } from './yolo.js';
 
 // Dynamic Schema Definition
 const SCHEMA = {
@@ -84,6 +85,22 @@ let modelBackend = 'unavailable';
 let embeddingSamples = [];
 let embeddingPromises = [];
 let objectLabels = [];
+let yoloReady = false;
+let yoloBusy = false;
+let detectionFrames = [];
+let detectionPromises = [];
+
+async function loadYoloModel() {
+  const status = $('#yoloLiveStatus');
+  try {
+    await initYolo();
+    yoloReady = true;
+    if (status) status.textContent = 'YOLOv8n · ON-DEVICE';
+  } catch (error) {
+    console.error('YOLO load failed:', error);
+    if (status) status.textContent = 'YOLO UNAVAILABLE';
+  }
+}
 
 async function loadVisionModel() {
   const status = $('#systemStatusText');
@@ -2038,6 +2055,10 @@ function sampleFrame() {
     if (visionModel && capturedFrameCanvases.length % 2 === 1) {
       embeddingPromises.push(extractMobileNetEmbedding(snap));
     }
+    if (yoloReady && !yoloBusy && capturedFrameCanvases.length % 4 === 1) {
+      const task = runYoloFrame(snap, capturedFrameCanvases.length - 1);
+      detectionPromises.push(task);
+    }
 
     // Compute pixel metrics
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -2092,6 +2113,22 @@ function sampleFrame() {
 
   } catch (e) {
     console.warn('Sample error:', e);
+  }
+}
+
+async function runYoloFrame(canvas, frameIndex) {
+  yoloBusy = true;
+  try {
+    const detections = await detectObjects(canvas);
+    detectionFrames.push({ frameIndex, at: frameIndex * 0.5, detections });
+    const overlay = $('#detectionOverlay');
+    if (overlay) drawDetections(overlay, detections, canvas.width, canvas.height);
+    const status = $('#yoloLiveStatus');
+    if (status) status.textContent = `YOLO · ${detections.length} OBJECT${detections.length === 1 ? '' : 'S'}`;
+  } catch (error) {
+    console.warn('YOLO frame skipped:', error);
+  } finally {
+    yoloBusy = false;
   }
 }
 
@@ -2150,6 +2187,8 @@ function toggleRecording() {
   embeddingSamples = [];
   embeddingPromises = [];
   objectLabels = [];
+  detectionFrames = [];
+  detectionPromises = [];
   sampleFrame();
   sampleTicker = setInterval(sampleFrame, 500);
 
@@ -2186,10 +2225,42 @@ async function finishRecording() {
   sampleFrame();
 
   recordedBlob = new Blob(chunks, { type: 'video/webm' });
-  await Promise.allSettled(embeddingPromises);
-  analyzeFrames();
+  await Promise.allSettled([...embeddingPromises, ...detectionPromises]);
   endCamera();
   showView('reviewView');
+  analyzeFrames();
+}
+
+async function analyzeUploadedVideo(file) {
+  recordedBlob = file;
+  toast(`Analyzing ${file.name}`);
+  frameMetrics = [];
+  capturedFrameCanvases = [];
+  embeddingSamples = [];
+  embeddingPromises = [];
+  detectionFrames = [];
+  detectionPromises = [];
+  objectLabels = [];
+  const video = $('#preview');
+  const url = URL.createObjectURL(file);
+  video.srcObject = null;
+  video.src = url;
+  await new Promise((resolve, reject) => {
+    video.onloadedmetadata = resolve;
+    video.onerror = reject;
+  });
+  const duration = Math.min(video.duration || 1, 12);
+  const samples = Math.min(8, Math.max(3, Math.ceil(duration)));
+  for (let i = 0; i < samples; i++) {
+    video.currentTime = samples === 1 ? 0 : (duration * i / (samples - 1));
+    await new Promise(resolve => video.onseeked = resolve);
+    sampleFrame();
+  }
+  await Promise.allSettled([...embeddingPromises, ...detectionPromises]);
+  URL.revokeObjectURL(url);
+  endCamera();
+  showView('reviewView');
+  analyzeFrames();
 }
 
 /* ==========================================================================
@@ -2207,8 +2278,11 @@ function analyzeFrames() {
   const motionMean = motions.reduce((a, b) => a + b, 0) / Math.max(1, motions.length);
   const motionPeaks = motions.slice(1, -1).filter((m, i) => m > motions[i] * 1.35 && m > motions[i + 2] * 1.35 && m > 6).length;
 
+  const allDetections = detectionFrames.flatMap(frame => frame.detections);
+  const largestArea = allDetections.reduce((max, d) => Math.max(max, d.width * d.height / (96 * 72)), 0);
+  const detectedOcclusion = largestArea > 0.62 ? 'heavy' : (largestArea > 0.32 ? 'partial' : null);
   proposedTags = {
-    occlusion: textureRatio < 0.32 ? 'heavy' : (textureRatio < 0.68 ? 'partial' : 'none'),
+    occlusion: detectedOcclusion || (textureRatio < 0.32 ? 'heavy' : (textureRatio < 0.68 ? 'partial' : 'none')),
     lighting: meanLum < 70 ? 'low-light' : (meanLum > 175 ? 'bright' : 'normal'),
     orientation: avg('gx') > avg('gy') * 1.18 ? 'rotated' : (avg('gy') > avg('gx') * 1.6 ? 'inverted' : 'upright'),
     environment: avg('verticalBias') > 12 ? 'floor' : 'bench',
@@ -2223,6 +2297,9 @@ function analyzeFrames() {
 
   renderKeyframeGallery();
   renderTagEditor();
+  const latestDetections = detectionFrames.at(-1)?.detections || [];
+  drawScene25D($('#scene25dCanvas'), latestDetections);
+  $('#detectedObjectCount').textContent = `${latestDetections.length} object${latestDetections.length === 1 ? '' : 's'}`;
 
   $('#processBar').style.width = '100%';
   setTimeout(() => {
@@ -2311,6 +2388,10 @@ async function commitClip() {
       keyframes: embeddingSamples.length,
       topLabel: objectLabels[0] || null
     },
+    detections: detectionFrames.map(frame => ({
+      at: frame.at,
+      objects: frame.detections.map(({ label, confidence, x, y, width, height, relativeDepth }) => ({ label, confidence, x, y, width, height, relativeDepth }))
+    })),
     video: recordedBlob
   };
 
@@ -2442,17 +2523,10 @@ function initEventListeners() {
     beginCapture();
   });
 
-  $('#videoFileInput')?.addEventListener('change', (e) => {
+  $('#videoFileInput')?.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (file) {
-      recordedBlob = file;
-      toast(`Loaded ${file.name}`);
-      frameMetrics = [
-        { mean: 125, variance: 820, centerVariance: 680, gx: 14, gy: 11, verticalBias: 4, motion: 12 }
-      ];
-      analyzeFrames();
-      endCamera();
-      showView('reviewView');
+      await analyzeUploadedVideo(file);
     }
   });
 
@@ -2581,6 +2655,7 @@ function initEventListeners() {
 // Launch
 document.addEventListener('DOMContentLoaded', () => {
   loadVisionModel();
+  loadYoloModel();
   initEventListeners();
   initSpatialVisualizer();
   loadDataset();

@@ -3278,6 +3278,17 @@ textarea {
   }
 }
 
+.detection-overlay { position:absolute; inset:0; width:100%; height:100%; z-index:6; pointer-events:none; }
+.yolo-live-status { position:absolute; right:12px; bottom:12px; z-index:9; padding:5px 8px; border:1px solid rgba(52,211,153,.45); border-radius:var(--radius-full); background:rgba(2,12,9,.76); color:var(--emerald-light); font:600 9px 'JetBrains Mono',monospace; backdrop-filter:blur(10px); }
+.scene25d-card { margin-bottom:16px; }
+.scene25d-canvas { display:block; width:100%; height:clamp(220px,42vw,360px); margin-top:12px; border:1px solid var(--border-card); border-radius:var(--radius-md); }
+.scene25d-note { margin-top:8px; color:var(--ink-muted); font-size:11px; }
+@media (max-width:899px) {
+  .yolo-live-status { bottom:calc(118px + var(--safe-bottom)); }
+  .scene25d-card { padding:12px; }
+  .scene25d-canvas { height:min(42dvh,300px); }
+}
+
 /* Guided phone flow: one decision per screen. */
 .mobile-flow-guide,
 .mobile-preview-btn,

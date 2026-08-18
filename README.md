@@ -62,6 +62,8 @@ The fixed schema contains:
 - Installable, standalone PWA
 - Camera capture through `getUserMedia` and `MediaRecorder`
 - TensorFlow.js MobileNetV1 embeddings extracted locally from sampled keyframes using WebGL
+- YOLOv8n general-object detection through ONNX Runtime Web during recording and review
+- Detection-driven relative 2.5D scene projection with an explicit non-metric depth label
 - Embedding-distance novelty incorporated into deterministic priority scoring
 - Multi-keyframe features for brightness, texture, edge orientation, scene bias, and motion
 - Auto-tag proposals with one-tap correction
@@ -119,3 +121,12 @@ TRACE/
 ## Prototype limitations
 
 MobileNet provides the local visual embedding backbone and novelty signal. Context and outcome proposals still use lightweight, interpretable feature rules because the prototype does not yet include enough labeled robot clips to train a calibrated classifier on top of the embeddings. Proposals are intentionally reviewable. A production version should train that classifier against representative robot demonstrations and ingest robot telemetry alongside video.
+
+YOLOv8n detects the 80 common COCO object classes; it is not an open-vocabulary detector. The generated scene is a 2.5D visualization based on bounding-box position and relative scale, not calibrated metric geometry. True 3D reconstruction would require depth sensing, camera calibration, or a multi-view reconstruction model.
+
+## Model attribution
+
+- TensorFlow.js and MobileNet: Apache-2.0
+- ONNX Runtime Web: MIT
+- YOLOv8n model architecture and weights: Ultralytics; review the current Ultralytics licensing terms before commercial distribution
+- Browser-ready YOLOv8n ONNX conversion sourced from `Hyuto/yolov8-onnxruntime-web`

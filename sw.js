@@ -1,9 +1,11 @@
-const CACHE = 'trace-v5-guided-mobile';
+const CACHE = 'trace-v6-yolo-scene';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
+  './yolo.js',
+  './models/yolov8n.onnx',
   './manifest.webmanifest',
   './icon.svg'
 ];
