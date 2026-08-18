@@ -58,7 +58,7 @@ function suppress(boxes, threshold = 0.45, limit = 12) {
   return kept;
 }
 
-export async function detectObjects(source, confidenceThreshold = 0.27) {
+export async function detectObjects(source, confidenceThreshold = 0.30) {
   const model = await initYolo();
   const size = 640;
   const canvas = document.createElement('canvas');

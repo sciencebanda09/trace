@@ -2343,6 +2343,7 @@ async function finishRecording() {
   if (visionModel && yoloReady && detectionCanvases.length) {
     const selected = [detectionCanvases[0], detectionCanvases[Math.floor(detectionCanvases.length / 2)], detectionCanvases.at(-1)].filter((item, index, all) => item && all.indexOf(item) === index);
     for (const canvas of selected) await extractMobileNetEmbedding(canvas);
+    await refineAmbiguousDetections();
   }
   await Promise.allSettled(embeddingPromises);
   endCamera();
@@ -2381,12 +2382,72 @@ async function analyzeUploadedVideo(file) {
   if (visionModel && yoloReady && detectionCanvases.length) {
     const selected = [detectionCanvases[0], detectionCanvases[Math.floor(detectionCanvases.length / 2)], detectionCanvases.at(-1)].filter((item, index, all) => item && all.indexOf(item) === index);
     for (const canvas of selected) await extractMobileNetEmbedding(canvas);
+    await refineAmbiguousDetections();
   }
   await Promise.allSettled(embeddingPromises);
   URL.revokeObjectURL(url);
   endCamera();
   showView('reviewView');
   analyzeFrames();
+}
+
+const IMAGENET_TO_COCO = [
+  { pattern: /notebook|laptop|portable computer/i, label: 'laptop' },
+  { pattern: /television|monitor|screen|desktop computer/i, label: 'tv' },
+  { pattern: /cellular telephone|mobile phone|smartphone/i, label: 'cell phone' },
+  { pattern: /book jacket|comic book|bookshop|library/i, label: 'book' },
+  { pattern: /coffee mug|cup/i, label: 'cup' },
+  { pattern: /water bottle|beer bottle|pop bottle/i, label: 'bottle' },
+  { pattern: /computer keyboard|typewriter keyboard/i, label: 'keyboard' },
+  { pattern: /computer mouse|mouse/i, label: 'mouse' }
+];
+
+function mappedImageNetLabel(className) {
+  return IMAGENET_TO_COCO.find(item => item.pattern.test(className))?.label || null;
+}
+
+async function refineAmbiguousDetections() {
+  if (!visionModel || !detectionFrames.length) return;
+  const ambiguous = new Set(['cell phone', 'book', 'laptop', 'tv', 'cup', 'bottle', 'keyboard', 'mouse']);
+  const frame = detectionFrames.at(-1);
+  const source = detectionCanvases.at(-1);
+  if (!source) return;
+  const candidates = frame.detections.filter(item => ambiguous.has(item.label)).sort((a, b) => b.confidence - a.confidence).slice(0, 4);
+  for (const detection of candidates) {
+    const crop = document.createElement('canvas');
+    crop.width = Math.max(32, Math.round(detection.width));
+    crop.height = Math.max(32, Math.round(detection.height));
+    crop.getContext('2d').drawImage(source, detection.x, detection.y, detection.width, detection.height, 0, 0, crop.width, crop.height);
+    try {
+      const predictions = await visionModel.classify(crop, 5);
+      const match = predictions.map(item => ({ ...item, mapped: mappedImageNetLabel(item.className) })).find(item => item.mapped);
+      if (match && match.probability >= 0.12) {
+        detection.yoloLabel = detection.label;
+        detection.label = match.mapped;
+        detection.refinedBy = 'MobileNet crop verification';
+        detection.refinementConfidence = match.probability;
+      }
+    } catch (error) {
+      console.warn('Crop verification skipped:', error);
+    }
+  }
+  applyTemporalLabelVoting();
+}
+
+function applyTemporalLabelVoting() {
+  const tracks = [];
+  detectionFrames.forEach(frame => frame.detections.forEach(detection => {
+    const cx = detection.x + detection.width / 2, cy = detection.y + detection.height / 2;
+    let track = tracks.find(item => Math.hypot(item.cx - cx, item.cy - cy) < Math.max(detection.width, detection.height) * .65);
+    if (!track) { track = { cx, cy, detections: [] }; tracks.push(track); }
+    track.cx = (track.cx + cx) / 2; track.cy = (track.cy + cy) / 2; track.detections.push(detection);
+  }));
+  tracks.forEach(track => {
+    const votes = new Map();
+    track.detections.forEach(item => votes.set(item.label, (votes.get(item.label) || 0) + item.confidence * (item.refinedBy ? 5 : 1)));
+    const winner = [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (winner) track.detections.forEach(item => { item.label = winner; item.temporalConsensus = track.detections.length; });
+  });
 }
 
 /* ==========================================================================
@@ -2419,9 +2480,11 @@ function analyzeFrames() {
   const strongestDetection = allDetections.sort((a, b) => b.confidence - a.confidence)[0];
   proposedEvidence = {
     object: {
-      measurement: strongestDetection ? `${strongestDetection.label} detected` : 'No known COCO class detected',
+      measurement: strongestDetection ? `${strongestDetection.label} detected${strongestDetection.refinedBy ? ' and crop-verified' : ''}` : 'No known COCO class detected',
       inference: strongestDetection?.label || 'unknown object',
-      confidence: strongestDetection?.confidence || 0
+      confidence: strongestDetection?.refinedBy
+        ? strongestDetection.confidence * .55 + strongestDetection.refinementConfidence * .45
+        : strongestDetection?.confidence || 0
     },
     occlusion: {
       measurement: allDetections.length ? `Largest detection occupies ${Math.round(largestArea * 100)}% of frame` : `Center texture ratio ${textureRatio.toFixed(2)}`,

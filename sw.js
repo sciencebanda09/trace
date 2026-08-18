@@ -1,4 +1,4 @@
-const CACHE = 'trace-v10-yolo-performance';
+const CACHE = 'trace-v11-detection-fusion';
 const ASSETS = [
   './',
   './index.html',

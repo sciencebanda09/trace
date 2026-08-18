@@ -130,6 +130,8 @@ YOLOv8n detects the 80 common COCO object classes; it is not an open-vocabulary 
 
 Live detection uses dedicated 320×240 camera samples, serialized model execution, and WebGPU/WebNN when available with a multithreaded WASM fallback on cross-origin-isolated deployments. MobileNet embedding work is deferred until capture stops so the two models do not contend during recording.
 
+After capture, ambiguous COCO detections such as book/cell phone and laptop/TV are rechecked using MobileNet crop classification and stabilized with temporal label voting. Live boxes remain YOLO-only to preserve recording responsiveness.
+
 ## Model attribution
 
 - TensorFlow.js and MobileNet: Apache-2.0
