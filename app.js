@@ -3,23 +3,15 @@
  * Dynamic deterministic priority scoring, on-device vision, and evidence pipeline.
  */
 import { initYolo, detectObjects, drawDetections, getYoloRuntime } from './yolo.js';
+import { TRACE_SCHEMA as SCHEMA, CAPTURE_CONFIG, DEFAULT_WEIGHTS } from './core/schema.js';
+import { generateCombinations, scoreExperiments, calculateDatasetReadiness } from './core/priority-engine.js';
+import { getRecords, putRecord, removeRecord, clearRecords, storageEstimate } from './core/storage.js';
+import { calibrationCorrection, confidenceLabel } from './core/evidence.js';
+import { detectDeviceCapabilities, describeSourceDevice, formatClock } from './core/capture.js';
+import { OPTIONAL_SIMULATOR_ENABLED } from './core/simulator.js';
+import { setExclusiveView } from './core/ui.js';
 
 // Dynamic Schema Definition
-const SCHEMA = {
-  occlusion: ['none', 'partial', 'heavy'],
-  lighting: ['bright', 'normal', 'low-light'],
-  orientation: ['upright', 'rotated', 'inverted'],
-  environment: ['bench', 'floor'],
-  result: ['success', 'failure'],
-  recovery: ['no', 'yes']
-};
-
-const CAPTURE_CONFIG = Object.freeze({
-  defaultMaxDurationSeconds: 30,
-  keyframeIntervalMs: 750,
-  uploadedVideoSampleLimit: 12
-});
-
 const taskProfile = {
   id: 'generic-manipulation',
   task: 'manipulation',
@@ -78,12 +70,8 @@ let recommendation = null;
 let activeRankIndex = 0;
 
 // Dynamic Engine Weights (Configurable by user in Real-Time)
-let engineWeights = {
-  gap: 0.30,
-  failure: 0.50,
-  novelty: 0.20,
-  costSensitivity: 1.00
-};
+let engineWeights = { ...DEFAULT_WEIGHTS };
+let calibrationCorrections = [];
 
 // Camera & Capture State
 let stream = null;
@@ -106,27 +94,6 @@ let imuSamples = [];
 let audioEnabled = false;
 let deviceCapabilities = null;
 
-function detectCapabilities() {
-  return {
-    camera: Boolean(navigator.mediaDevices?.getUserMedia),
-    microphone: Boolean(navigator.mediaDevices?.getUserMedia),
-    imu: 'DeviceMotionEvent' in globalThis,
-    gps: 'geolocation' in navigator,
-    webgl: Boolean(document.createElement('canvas').getContext('webgl')),
-    webgpu: Boolean(navigator.gpu),
-    indexedDB: 'indexedDB' in globalThis
-  };
-}
-
-function sourceDevice() {
-  return {
-    platform: navigator.userAgentData?.platform || navigator.platform || 'unknown',
-    mobile: navigator.userAgentData?.mobile ?? /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent),
-    viewport: `${screen.width}x${screen.height}`,
-    pixelRatio: devicePixelRatio || 1
-  };
-}
-
 function collectMotionSample(event) {
   if (!recordingStartedAt || imuSamples.length >= 300) return;
   const a = event.accelerationIncludingGravity;
@@ -148,6 +115,8 @@ let detectionFrames = [];
 let detectionPromises = [];
 let detectionCanvases = [];
 let yoloLatencyMs = 0;
+let playbackUrl = null;
+let outcomeConfirmed = false;
 
 async function loadYoloModel() {
   const status = $('#yoloLiveStatus');
@@ -159,6 +128,7 @@ async function loadYoloModel() {
     console.error('YOLO load failed:', error);
     if (status) status.textContent = 'YOLO UNAVAILABLE';
   }
+  renderModelHealth();
 }
 
 async function loadVisionModel() {
@@ -178,6 +148,19 @@ async function loadVisionModel() {
     console.error('MobileNet load failed:', error);
     if (status) status.textContent = 'Model Unavailable · Heuristic Fallback';
   }
+  renderModelHealth();
+}
+
+function renderModelHealth() {
+  const container = $('#modelHealthStrip');
+  if (!container) return;
+  const items = [
+    ['YOLO', yoloReady ? getYoloRuntime().backend.toUpperCase() : 'loading', yoloReady],
+    ['MobileNet', visionModel ? modelBackend.toUpperCase() : 'loading', Boolean(visionModel)],
+    ['Storage', deviceCapabilities?.indexedDB ? 'local' : 'memory', Boolean(deviceCapabilities?.indexedDB)],
+    ['Latency', yoloLatencyMs ? `${Math.round(yoloLatencyMs)}ms` : 'not measured', !yoloLatencyMs || yoloLatencyMs < 1500]
+  ];
+  container.innerHTML = items.map(([name,value,ok])=>`<span class="${ok?'healthy':'degraded'}"><i></i>${name}<b>${value}</b></span>`).join('');
 }
 
 function cosineDistance(a, b) {
@@ -263,12 +246,7 @@ function openDB() {
 
 async function loadDataset() {
   try {
-    const db = await openDB();
-    clips = await new Promise((res, rej) => {
-      const q = db.transaction('clips', 'readonly').objectStore('clips').getAll();
-      q.onsuccess = () => res(q.result);
-      q.onerror = () => rej(q.error);
-    });
+    clips = await getRecords();
 
     if (!clips.length) {
       clips = [...seed];
@@ -284,13 +262,7 @@ async function loadDataset() {
 
 async function saveRecord(row) {
   try {
-    const db = await openDB();
-    await new Promise((res, rej) => {
-      const tx = db.transaction('clips', 'readwrite');
-      const q = tx.objectStore('clips').put(row);
-      q.onsuccess = res;
-      q.onerror = () => rej(q.error);
-    });
+    await putRecord(row);
   } catch (err) {
     console.warn('Record save error:', err);
   }
@@ -298,13 +270,7 @@ async function saveRecord(row) {
 
 async function deleteRecord(id) {
   try {
-    const db = await openDB();
-    await new Promise((res, rej) => {
-      const tx = db.transaction('clips', 'readwrite');
-      const q = tx.objectStore('clips').delete(id);
-      q.onsuccess = res;
-      q.onerror = () => rej(q.error);
-    });
+    await removeRecord(id);
     clips = clips.filter(c => c.id !== id);
     renderAll();
     toast(`Demonstration ${id} deleted`);
@@ -315,13 +281,7 @@ async function deleteRecord(id) {
 
 async function resetDataset() {
   try {
-    const db = await openDB();
-    await new Promise((res, rej) => {
-      const tx = db.transaction('clips', 'readwrite');
-      const q = tx.objectStore('clips').clear();
-      q.onsuccess = res;
-      q.onerror = () => rej(q.error);
-    });
+    await clearRecords();
     clips = [...seed];
     await Promise.all(seed.map(saveRecord));
   } catch {
@@ -335,6 +295,8 @@ async function resetDataset() {
    Combinatorics & Dynamic Priority Math
    ========================================================================== */
 function combinations() {
+  return generateCombinations(SCHEMA);
+  /* legacy implementation retained temporarily for compatibility */
   const contextKeys = ['occlusion', 'lighting', 'orientation', 'environment'];
   let results = [{}];
 
@@ -385,6 +347,8 @@ function getContextDifficultyCost(x) {
 }
 
 function scoreAll() {
+  return scoreExperiments({ clips, schema: SCHEMA, weights: engineWeights, noveltyFor: embeddingNoveltyFor });
+  /* legacy implementation retained temporarily for compatibility */
   const failures = clips.filter(c => c.result === 'failure');
   const allCombos = combinations();
   const maxCount = Math.max(1, ...allCombos.map(x => countExact(x)));
@@ -429,6 +393,8 @@ function scoreAll() {
 }
 
 function calculateReadiness() {
+  return { total: calculateDatasetReadiness(clips, SCHEMA) };
+  /* legacy implementation retained temporarily for compatibility */
   const contextKeys = ['occlusion', 'lighting', 'orientation', 'environment'];
   
   const catCov = contextKeys.reduce((sum, key) => 
@@ -503,6 +469,12 @@ function renderSpotlight() {
   ).length;
 
   $('#rationale').textContent = `${matching}/${failures.length} failures match these conditions · ${recommendation.count} existing examples.`;
+  const story = $('#failureStory');
+  if (story) story.innerHTML = `
+    <div><b>${failures.length}</b><span>logged failures</span></div><i>→</i>
+    <div><b>${matching}</b><span>matching pattern</span></div><i>→</i>
+    <div><b>${pct(recommendation.gap)}</b><span>dataset gap</span></div><i>→</i>
+    <div class="story-target"><b>#${activeRankIndex+1}</b><span>collect next</span></div>`;
 
   // Signal Metrics
   $('#failureScore').textContent = pct(recommendation.failure);
@@ -678,6 +650,7 @@ function renderCoverageMatrix() {
 function renderDatasetVault() {
   const tbody = $('#datasetTableBody');
   if (!tbody) return;
+  updateStorageUsage();
 
   const total = clips.length;
   const failures = clips.filter(c => c.result === 'failure').length;
@@ -2052,6 +2025,7 @@ async function beginCapture() {
   showView('captureView');
   capturedFrameCanvases = [];
   frameMetrics = [];
+  $('#preview')?.classList.remove('uploaded-source');
   updateKeyframeLiveStrip();
   await enableOptionalImu();
 
@@ -2118,8 +2092,7 @@ function endCamera() {
 }
 
 function formatDuration(totalSeconds) {
-  const value = Math.max(0, Math.round(totalSeconds));
-  return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+  return formatClock(totalSeconds);
 }
 
 function sampleFrame() {
@@ -2127,11 +2100,16 @@ function sampleFrame() {
   const canvas = $('#sample');
   if (!canvas) return;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  canvas.width = 96;
-  canvas.height = 72;
-
   try {
     if (!video || video.videoWidth <= 0) return;
+    const aspect = video.videoWidth / video.videoHeight;
+    if (aspect >= 1) {
+      canvas.width = 160;
+      canvas.height = Math.max(64, Math.round(160 / aspect));
+    } else {
+      canvas.height = 160;
+      canvas.width = Math.max(64, Math.round(160 * aspect));
+    }
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const snap = document.createElement('canvas');
@@ -2148,8 +2126,13 @@ function sampleFrame() {
     }
     if (yoloReady && !yoloBusy && (capturedFrameCanvases.length === 1 || capturedFrameCanvases.length % 4 === 0)) {
       const detectorFrame = document.createElement('canvas');
-      detectorFrame.width = 320;
-      detectorFrame.height = 240;
+      if (aspect >= 1) {
+        detectorFrame.width = 320;
+        detectorFrame.height = Math.max(128, Math.round(320 / aspect));
+      } else {
+        detectorFrame.height = 320;
+        detectorFrame.width = Math.max(128, Math.round(320 * aspect));
+      }
       detectorFrame.getContext('2d').drawImage(video, 0, 0, detectorFrame.width, detectorFrame.height);
       detectionCanvases.push(detectorFrame);
       const task = runYoloFrame(detectorFrame, capturedFrameCanvases.length - 1);
@@ -2174,7 +2157,7 @@ function sampleFrame() {
         if (y < canvas.height / 3) topSum += val;
         if (y >= (canvas.height * 2) / 3) bottomSum += val;
 
-        if (x > 24 && x < 72 && y > 18 && y < 54) {
+        if (x > canvas.width * .25 && x < canvas.width * .75 && y > canvas.height * .25 && y < canvas.height * .75) {
           centerSum += val;
           centerSqSum += val * val;
           centerCount++;
@@ -2223,6 +2206,7 @@ async function runYoloFrame(canvas, frameIndex) {
     if (overlay) drawDetections(overlay, detections, canvas.width, canvas.height);
     const status = $('#yoloLiveStatus');
     if (status) status.textContent = `YOLO · ${detections.length} · ${Math.round(yoloLatencyMs)}ms`;
+    renderModelHealth();
   } catch (error) {
     console.warn('YOLO frame skipped:', error);
   } finally {
@@ -2366,6 +2350,7 @@ async function analyzeUploadedVideo(file) {
   const url = URL.createObjectURL(file);
   video.srcObject = null;
   video.src = url;
+  video.classList.add('uploaded-source');
   await new Promise((resolve, reject) => {
     video.onloadedmetadata = resolve;
     video.onerror = reject;
@@ -2509,6 +2494,14 @@ function analyzeFrames() {
   };
   proposedTask = taskProfile.task;
   proposedObject = proposedEvidence.object.inference;
+  calibrationCorrections = [];
+  outcomeConfirmed = false;
+  if (playbackUrl) URL.revokeObjectURL(playbackUrl);
+  playbackUrl = recordedBlob?.size ? URL.createObjectURL(recordedBlob) : null;
+  const playback = $('#reviewPlayback');
+  if (playback) { playback.src = playbackUrl || ''; playback.hidden = !playbackUrl; }
+  $$('[data-confirm-result]').forEach(button => button.classList.remove('selected'));
+  if ($('#confirmRecovery')) $('#confirmRecovery').checked = proposedTags.recovery === 'yes';
 
   $('#featLuminance').textContent = `${Math.round(meanLum)} / 255`;
   $('#featTexture').textContent = textureRatio.toFixed(2);
@@ -2526,7 +2519,7 @@ function analyzeFrames() {
     $('#processState').textContent = visionModel
       ? `${embeddingSamples.length} MOBILENET EMBEDDINGS · ${modelBackend.toUpperCase()}`
       : `${frames.length} KEYFRAMES · HEURISTIC FALLBACK`;
-    $('#saveClip').disabled = false;
+    $('#saveClip').disabled = !outcomeConfirmed;
   }, 600);
 }
 
@@ -2544,7 +2537,7 @@ function renderDetectionEvidence(metrics) {
     ? objects.map(d => `<span class="detected-object-chip"><b>${titleCase(d.label)}</b><small>${Math.round(d.confidence * 100)}%</small></span>`).join('')
     : '<span class="evidence-empty">No known COCO object detected; visual features still produced reviewable tags.</span>';
   const evidence = Object.entries(proposedEvidence);
-  tagList.innerHTML = evidence.map(([name, item]) => `<div class="tag-evidence-row"><span>${titleCase(name)}</span><b>${titleCase(item.inference)}</b><small>${item.measurement}</small><em>${Math.round(item.confidence * 100)}%</em></div>`).join('');
+  tagList.innerHTML = evidence.map(([name, item]) => `<div class="tag-evidence-row confidence-${confidenceLabel(item.confidence)}"><span>${titleCase(name)}</span><b>${titleCase(item.inference)}</b><small>${item.measurement}</small><em title="${confidenceLabel(item.confidence)} confidence">${Math.round(item.confidence * 100)}%</em></div>`).join('');
 }
 
 function renderKeyframeGallery() {
@@ -2607,6 +2600,8 @@ function renderTagEditor() {
   $$('.tag-toggle-pill').forEach(btn => {
     btn.onclick = () => {
       proposedTags[btn.dataset.key] = btn.dataset.value;
+      const original = proposedEvidence[btn.dataset.key]?.inference;
+      if (original && original !== btn.dataset.value) calibrationCorrections.push(calibrationCorrection({ attribute:btn.dataset.key, from:original, to:btn.dataset.value, evidence:proposedEvidence[btn.dataset.key] }));
       renderTagEditor();
     };
   });
@@ -2615,6 +2610,7 @@ function renderTagEditor() {
 }
 
 async function commitClip() {
+  if (!outcomeConfirmed) { toast('Confirm the actual outcome before saving'); return; }
   const beforeReadiness = calculateReadiness().total;
   const beforeImpact = distributionSnapshot();
   const notes = $('#operatorNotes')?.value || '';
@@ -2628,12 +2624,13 @@ async function commitClip() {
     created: Date.now(),
     source: 'live',
     durationSeconds: Number(recordedDurationSeconds.toFixed(2)),
-    sourceDevice: sourceDevice(),
+    sourceDevice: describeSourceDevice(),
     task: proposedTask,
     object: proposedObject,
     ...proposedTags,
     notes,
     evidence: Object.entries(proposedEvidence).map(([attribute, item]) => ({ attribute, ...item })),
+    calibrationCorrections: [...calibrationCorrections],
     optionalMetadata: {
       audio: { available: audioEnabled },
       imu: { available: deviceCapabilities?.imu || false, samples: imuSamples },
@@ -2743,6 +2740,41 @@ function exportDatasetJson() {
   toast('Exported dataset to JSON');
 }
 
+async function importDatasetFiles(files) {
+  const list = [...files];
+  const jsonFiles = list.filter(file => file.type === 'application/json' || file.name.toLowerCase().endsWith('.json'));
+  const videoFiles = list.filter(file => file.type.startsWith('video/'));
+  let imported = 0;
+  for (const file of jsonFiles) {
+    try {
+      const parsed = JSON.parse(await file.text());
+      const rows = Array.isArray(parsed) ? parsed : parsed.demonstrations;
+      if (!Array.isArray(rows)) throw new Error('Expected an array of demonstrations');
+      for (const raw of rows) {
+        if (!raw || typeof raw !== 'object') continue;
+        const row = { ...raw, id: raw.id || `import-${crypto.randomUUID?.() || Date.now()}`, created: raw.created || Date.now(), source:'import' };
+        clips.push(row); await saveRecord(row); imported++;
+      }
+    } catch (error) { toast(`${file.name}: invalid TRACE JSON`); }
+  }
+  if (imported) { renderAll(); toast(`Imported ${imported} demonstrations`); }
+  if (videoFiles.length) {
+    if (videoFiles.length > 1) toast('Opening the first video; confirm each clip separately');
+    await analyzeUploadedVideo(videoFiles[0]);
+  }
+}
+
+async function updateStorageUsage() {
+  const text = $('#storageUsageText'), bar = $('#storageUsageBar');
+  if (!text || !bar) return;
+  const {usage=0,quota=0} = await storageEstimate();
+  const percent = quota ? usage/quota*100 : 0;
+  text.textContent = quota ? `Local storage ${(usage/1048576).toFixed(1)} MB of ${(quota/1048576).toFixed(0)} MB (${percent.toFixed(1)}%)` : `${clips.length} local records · quota unavailable`;
+  bar.style.width = `${Math.min(100,percent)}%`;
+  bar.classList.toggle('warning', percent >= 80);
+  if (percent >= 90) toast('Storage nearly full. Export or delete recordings.');
+}
+
 /* ==========================================================================
    Toast Notification & View Switching
    ========================================================================== */
@@ -2755,7 +2787,7 @@ function toast(msg) {
 }
 
 function showView(viewId) {
-  $$('.view').forEach(v => v.classList.toggle('active', v.id === viewId));
+  setExclusiveView($$('.view'), viewId);
   $$('.tab-btn').forEach(t => t.classList.toggle('active', t.dataset.view === viewId));
   $$('.mobile-tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === viewId));
 
@@ -2782,6 +2814,15 @@ function initEventListeners() {
   $('#quickRecordMobile')?.addEventListener('click', beginCapture);
   $('#recordThis')?.addEventListener('click', beginCapture);
   $('#quickSimulateBtn')?.addEventListener('click', injectSyntheticDemo);
+  $('#reRecordBtn')?.addEventListener('click', () => { if (playbackUrl) URL.revokeObjectURL(playbackUrl); playbackUrl=null; beginCapture(); });
+  $$('[data-confirm-result]').forEach(button => button.addEventListener('click', () => {
+    proposedTags.result = button.dataset.confirmResult;
+    outcomeConfirmed = true;
+    $$('[data-confirm-result]').forEach(item => item.classList.toggle('selected', item === button));
+    $('#saveClip').disabled = false;
+  }));
+  $('#confirmRecovery')?.addEventListener('change', event => { proposedTags.recovery = event.target.checked ? 'yes' : 'no'; });
+  $('#datasetImportInput')?.addEventListener('change', event => importDatasetFiles(event.target.files));
 
   $('#toggleDiagnostics')?.addEventListener('click', () => {
     const wrapper = $('.review-wrapper');
@@ -2936,10 +2977,10 @@ function initEventListeners() {
 
 // Launch
 document.addEventListener('DOMContentLoaded', () => {
-  deviceCapabilities = detectCapabilities();
+  deviceCapabilities = detectDeviceCapabilities();
   loadVisionModel();
   loadYoloModel();
   initEventListeners();
-  initSpatialVisualizer();
+  if (OPTIONAL_SIMULATOR_ENABLED) initSpatialVisualizer();
   loadDataset();
 });

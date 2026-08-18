@@ -105,6 +105,7 @@
         <div class="mobile-flow-guide" aria-label="TRACE workflow">
           <span class="active">1 · Review</span><i></i><span>2 · Record</span><i></i><span>3 · Confirm</span>
         </div>
+        <div id="modelHealthStrip" class="model-health-strip" aria-label="Perception health"></div>
         
         <!-- Clean, Breathable Recommendation Showcase -->
         <div class="spotlight-card">
@@ -123,6 +124,8 @@
               <b class="readiness-value"><span id="coverage">0</span>%</b>
             </div>
           </div>
+
+          <div id="failureStory" class="failure-story" aria-label="Why this experiment ranks first"></div>
 
           <div class="spotlight-main-grid">
             
@@ -449,8 +452,10 @@
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               <span>Export JSON</span>
             </button>
+            <label class="btn-glass btn-sm upload-label">Import data<input id="datasetImportInput" type="file" accept="application/json,video/*" multiple hidden></label>
           </div>
         </div>
+        <div class="storage-health"><span id="storageUsageText">Checking local storage…</span><div><i id="storageUsageBar"></i></div></div>
 
         <!-- Filter & Search Toolbar -->
         <div class="vault-filter-bar">
@@ -681,6 +686,11 @@
 
           <button id="toggleDiagnostics" class="btn-glass diagnostics-toggle" aria-expanded="false">Show technical analysis</button>
 
+          <div class="glass-panel playback-card">
+            <video id="reviewPlayback" controls playsinline></video>
+            <button id="reRecordBtn" class="btn-glass">Re-record</button>
+          </div>
+
           <div class="glass-panel detection-evidence-card">
             <div class="panel-header">
               <div><h2 class="panel-title">Why the phone proposed these tags</h2><span class="panel-subtitle">Evidence from YOLO, visual features and motion</span></div>
@@ -738,6 +748,12 @@
               </div>
             </div>
             <div id="tagEditor" class="tag-groups-grid"></div>
+
+            <fieldset class="outcome-confirmation">
+              <legend>What actually happened? <small>Operator confirmation required</small></legend>
+              <div><button type="button" data-confirm-result="success">Success</button><button type="button" data-confirm-result="failure">Failure</button></div>
+              <label><input id="confirmRecovery" type="checkbox"> Recovery or retry occurred</label>
+            </fieldset>
 
             <div class="operator-notes-wrap">
               <label for="operatorNotes">NOTES (OPTIONAL)</label>
