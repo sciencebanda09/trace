@@ -61,20 +61,21 @@ The fixed schema contains:
 
 - Installable, standalone PWA
 - Camera capture through `getUserMedia` and `MediaRecorder`
+- Configurable capture profiles with a 30-second default maximum and user-controlled early stop
+- Capability-aware video capture with optional microphone and IMU metadata
 - TensorFlow.js MobileNetV1 embeddings extracted locally from sampled keyframes using WebGL
 - YOLOv8n general-object detection through ONNX Runtime Web during recording and review
-- Detection-driven relative 2.5D scene projection with an explicit non-metric depth label
+- Detection evidence explaining why each auto-tag was proposed
 - Embedding-distance novelty incorporated into deterministic priority scoring
 - Multi-keyframe features for brightness, texture, edge orientation, scene bias, and motion
 - Auto-tag proposals with one-tap correction
-- Interactive 3D physical workcell simulator with 60 FPS trajectory playback, Lambertian shading, drop shadows, and multi-angle camera presets (ISO, TOP, FRONT, TCP)
 - Real-time grasp kinematics simulation (standby, approach, clamp, lift & verify) with collision avoidance envelopes
 - Quick Condition Testing Lab & expanded 6-DOF Spatial Workspace Inspector
 - Failure-pattern and coverage matrix visualization
 - Offline app-shell caching through a service worker
 - Deliberately biased 20-clip seed dataset for a repeatable demonstration
 
-The seed data and attribute schema are intentionally fixed. Recommendations, coverage, explanations, inferred capture tags, and post-capture ranking are computed from the current IndexedDB contents.
+The deterministic demo dataset is intentionally biased for a reproducible walkthrough. The initial scoring dimensions are defined in one schema and demonstration records accept extensible task, object, evidence, optional sensor, telemetry, and external metadata fields.
 
 ## Run locally
 
@@ -104,6 +105,8 @@ The static production build is written to `dist/`.
 4. Review the locally proposed tags and confirm or correct them.
 5. Add the clip and show TRACE recompute readiness and the next experiment.
 
+Short recordings remain valid: the operator may stop at any point before the active task profile's maximum duration.
+
 ## Project structure
 
 ```text
@@ -122,7 +125,7 @@ TRACE/
 
 MobileNet provides the local visual embedding backbone and novelty signal. Context and outcome proposals still use lightweight, interpretable feature rules because the prototype does not yet include enough labeled robot clips to train a calibrated classifier on top of the embeddings. Proposals are intentionally reviewable. A production version should train that classifier against representative robot demonstrations and ingest robot telemetry alongside video.
 
-YOLOv8n detects the 80 common COCO object classes; it is not an open-vocabulary detector. The generated scene is a 2.5D visualization based on bounding-box position and relative scale, not calibrated metric geometry. True 3D reconstruction would require depth sensing, camera calibration, or a multi-view reconstruction model.
+YOLOv8n detects the 80 common COCO object classes; it is not an open-vocabulary detector. TRACE presents detections as evidence for reviewable tags rather than claiming metric 3D reconstruction from a single camera.
 
 ## Model attribution
 
