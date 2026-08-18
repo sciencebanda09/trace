@@ -4,7 +4,7 @@
  */
 import { initYolo, detectObjects, drawDetections, getYoloRuntime } from './yolo.js';
 import { TRACE_SCHEMA as SCHEMA, CAPTURE_CONFIG, DEFAULT_WEIGHTS } from './core/schema.js';
-import { generateCombinations, scoreExperiments, calculateDatasetReadiness } from './core/priority-engine.js';
+import { scoreExperiments, calculateDatasetReadiness } from './core/priority-engine.js';
 import { getRecords, putRecord, removeRecord, clearRecords, storageEstimate } from './core/storage.js';
 import { calibrationCorrection, confidenceLabel } from './core/evidence.js';
 import { detectDeviceCapabilities, describeSourceDevice, formatClock } from './core/capture.js';
@@ -291,129 +291,12 @@ async function resetDataset() {
   toast('Deterministic demo dataset loaded');
 }
 
-/* ==========================================================================
-   Combinatorics & Dynamic Priority Math
-   ========================================================================== */
-function combinations() {
-  return generateCombinations(SCHEMA);
-  /* legacy implementation retained temporarily for compatibility */
-  const contextKeys = ['occlusion', 'lighting', 'orientation', 'environment'];
-  let results = [{}];
-
-  for (const key of contextKeys) {
-    const next = [];
-    const values = SCHEMA[key] || [];
-    for (const combo of results) {
-      for (const val of values) {
-        next.push({ ...combo, [key]: val });
-      }
-    }
-    results = next;
-  }
-  return results;
-}
-
-function countExact(combo) {
-  return clips.filter(c => 
-    Object.keys(combo).every(k => c[k] === combo[k])
-  ).length;
-}
-
-function countExactFailures(combo) {
-  return clips.filter(c => 
-    c.result === 'failure' &&
-    Object.keys(combo).every(k => c[k] === combo[k])
-  ).length;
-}
-
-function getContextDifficultyCost(x) {
-  // Dynamically compute baseline setup difficulty from attribute levels
-  const costs = {
-    occlusion: { none: 1.0, partial: 1.15, heavy: 1.45 },
-    lighting: { normal: 1.0, bright: 1.05, 'low-light': 1.25 },
-    orientation: { upright: 1.0, rotated: 1.15, inverted: 1.40 },
-    environment: { bench: 1.0, floor: 1.10 }
-  };
-
-  let totalCost = 0;
-  let count = 0;
-  for (const [dim, val] of Object.entries(x)) {
-    if (costs[dim] && costs[dim][val] !== undefined) {
-      totalCost += costs[dim][val];
-      count++;
-    }
-  }
-  return count > 0 ? (totalCost / count) : 1.0;
-}
-
 function scoreAll() {
   return scoreExperiments({ clips, schema: SCHEMA, weights: engineWeights, noveltyFor: embeddingNoveltyFor });
-  /* legacy implementation retained temporarily for compatibility */
-  const failures = clips.filter(c => c.result === 'failure');
-  const allCombos = combinations();
-  const maxCount = Math.max(1, ...allCombos.map(x => countExact(x)));
-
-  return allCombos.map(x => {
-    const count = countExact(x);
-    const failCount = countExactFailures(x);
-    const gap = 1 - (count / maxCount);
-
-    // Overlap with logged failures across 4 context dimensions
-    const contextKeys = ['occlusion', 'lighting', 'orientation', 'environment'];
-    const overlaps = failures.map(f => 
-      contextKeys.filter(k => f[k] === x[k]).length / contextKeys.length
-    );
-    const failureScore = overlaps.length ? overlaps.reduce((a, b) => a + b, 0) / overlaps.length : 0;
-
-    // Novelty estimation
-    const noveltyFallback = Math.min(1, 0.35 + gap * 0.65);
-    const noveltyScore = embeddingNoveltyFor(x, noveltyFallback);
-
-    // Acquisition setup cost with user sensitivity exponent
-    const baseCost = getContextDifficultyCost(x);
-    const effectiveCost = Math.pow(baseCost, engineWeights.costSensitivity);
-
-    // Dynamic TRACE Ranking Equation
-    const numerator = (engineWeights.gap * gap) + 
-                      (engineWeights.failure * failureScore) + 
-                      (engineWeights.novelty * noveltyScore);
-    const priority = numerator / Math.max(0.1, effectiveCost);
-
-    return {
-      ...x,
-      count,
-      failCount,
-      gap,
-      failure: failureScore,
-      novelty: noveltyScore,
-      cost: baseCost,
-      priority
-    };
-  }).sort((a, b) => b.priority - a.priority);
 }
 
 function calculateReadiness() {
   return { total: calculateDatasetReadiness(clips, SCHEMA) };
-  /* legacy implementation retained temporarily for compatibility */
-  const contextKeys = ['occlusion', 'lighting', 'orientation', 'environment'];
-  
-  const catCov = contextKeys.reduce((sum, key) => 
-    sum + (new Set(clips.map(c => c[key])).size / SCHEMA[key].length), 0) / contextKeys.length;
-  
-  const occupied = new Set(clips.map(c => contextKeys.map(k => c[k]).join('|'))).size;
-  const comboCov = occupied / combinations().length;
-  
-  const outcomeCov = (
-    (new Set(clips.map(c => c.result)).size / SCHEMA.result.length) +
-    (new Set(clips.map(c => c.recovery)).size / SCHEMA.recovery.length)
-  ) / 2;
-
-  const total = Math.round(100 * (0.45 * catCov + 0.35 * comboCov + 0.2 * outcomeCov));
-  return {
-    total,
-    catCov: Math.round(catCov * 100),
-    comboCov: Math.round(comboCov * 100)
-  };
 }
 
 function pct(n) {
