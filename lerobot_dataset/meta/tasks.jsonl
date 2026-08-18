@@ -1,0 +1,10 @@
+{"task_index": 0, "task": "Pick and place upright manipuland on bench under normal lighting (none occlusion)"}
+{"task_index": 1, "task": "Pick and place upright manipuland on floor under normal lighting (none occlusion)"}
+{"task_index": 2, "task": "Pick and place rotated manipuland on bench under normal lighting (none occlusion)"}
+{"task_index": 3, "task": "Pick and place rotated manipuland on floor under normal lighting (none occlusion)"}
+{"task_index": 4, "task": "Pick and place upright manipuland on bench under normal lighting (partial occlusion)"}
+{"task_index": 5, "task": "Pick and place upright manipuland on bench under low-light lighting (partial occlusion)"}
+{"task_index": 6, "task": "Pick and place upright manipuland on floor under low-light lighting (partial occlusion)"}
+{"task_index": 7, "task": "Pick and place upright manipuland on bench under low-light lighting (none occlusion)"}
+{"task_index": 8, "task": "Pick and place rotated manipuland on floor under bright lighting (none occlusion)"}
+{"task_index": 9, "task": "Pick and place upright manipuland on bench under bright lighting (none occlusion)"}

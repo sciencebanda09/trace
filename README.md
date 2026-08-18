@@ -61,7 +61,9 @@ The fixed schema contains:
 
 - Installable, standalone PWA
 - Camera capture through `getUserMedia` and `MediaRecorder`
-- Multi-keyframe local analysis for brightness, texture, edge orientation, scene bias, and motion
+- TensorFlow.js MobileNetV1 embeddings extracted locally from sampled keyframes using WebGL
+- Embedding-distance novelty incorporated into deterministic priority scoring
+- Multi-keyframe features for brightness, texture, edge orientation, scene bias, and motion
 - Auto-tag proposals with one-tap correction
 - Interactive 3D physical workcell simulator with 60 FPS trajectory playback, Lambertian shading, drop shadows, and multi-angle camera presets (ISO, TOP, FRONT, TCP)
 - Real-time grasp kinematics simulation (standby, approach, clamp, lift & verify) with collision avoidance envelopes
@@ -116,5 +118,4 @@ TRACE/
 
 ## Prototype limitations
 
-The current auto-tagger uses lightweight visual and temporal heuristics rather than a trained embedding classifier. Its proposals are intentionally reviewable. A production version should replace these heuristics with a calibrated on-device embedding model trained against representative robot demonstrations and should ingest robot telemetry alongside video.
-
+MobileNet provides the local visual embedding backbone and novelty signal. Context and outcome proposals still use lightweight, interpretable feature rules because the prototype does not yet include enough labeled robot clips to train a calibrated classifier on top of the embeddings. Proposals are intentionally reviewable. A production version should train that classifier against representative robot demonstrations and ingest robot telemetry alongside video.

@@ -79,6 +79,55 @@ let proposedTags = {};
 let frameMetrics = [];
 let capturedFrameCanvases = [];
 let currentFacingMode = 'environment';
+let visionModel = null;
+let modelBackend = 'unavailable';
+let embeddingSamples = [];
+let embeddingPromises = [];
+let objectLabels = [];
+
+async function loadVisionModel() {
+  const status = $('#systemStatusText');
+  if (!globalThis.tf || !globalThis.mobilenet) {
+    if (status) status.textContent = 'Model Library Offline · Heuristic Fallback';
+    return;
+  }
+  try {
+    if (status) status.textContent = 'Loading MobileNet On-Device';
+    await tf.setBackend('webgl');
+    await tf.ready();
+    modelBackend = tf.getBackend();
+    visionModel = await mobilenet.load({ version: 1, alpha: 0.25 });
+    if (status) status.textContent = `MobileNet Ready · ${modelBackend.toUpperCase()}`;
+  } catch (error) {
+    console.error('MobileNet load failed:', error);
+    if (status) status.textContent = 'Model Unavailable · Heuristic Fallback';
+  }
+}
+
+function cosineDistance(a, b) {
+  let dot = 0, aa = 0, bb = 0;
+  const size = Math.min(a.length, b.length);
+  for (let i = 0; i < size; i++) {
+    dot += a[i] * b[i];
+    aa += a[i] * a[i];
+    bb += b[i] * b[i];
+  }
+  return aa && bb ? 1 - dot / (Math.sqrt(aa) * Math.sqrt(bb)) : 0;
+}
+
+function embeddingNoveltyFor(context, fallback) {
+  const embedded = clips.filter(c => Array.isArray(c.embedding));
+  const related = embedded.filter(c =>
+    ['occlusion', 'lighting', 'orientation', 'environment'].filter(k => c[k] === context[k]).length >= 2
+  );
+  if (embedded.length < 2 || !related.length) return fallback;
+  const distances = related.flatMap(a =>
+    embedded.filter(b => b.id !== a.id).map(b => cosineDistance(a.embedding, b.embedding))
+  );
+  return distances.length
+    ? Math.min(1, distances.reduce((a, b) => a + b, 0) / distances.length)
+    : fallback;
+}
 
 // UI Navigation & Filters
 let activeMatrixFilter = 'all';
@@ -104,6 +153,9 @@ let spatial = {
   renderMode: 'shaded',    // 'shaded', 'wireframe', 'collision'
   autoOrbit: false,
   orbitSpeed: 0.007,
+  gyroActive: false,
+  gyroBaseline: { beta: null, gamma: null },
+  gyroSensitivity: 0.025,
   isSimGrasp: true,
   graspProgress: 0.0,
   graspSpeed: 0.004,
@@ -274,7 +326,8 @@ function scoreAll() {
     const failureScore = overlaps.length ? overlaps.reduce((a, b) => a + b, 0) / overlaps.length : 0;
 
     // Novelty estimation
-    const noveltyScore = Math.min(1, 0.35 + gap * 0.65);
+    const noveltyFallback = Math.min(1, 0.35 + gap * 0.65);
+    const noveltyScore = embeddingNoveltyFor(x, noveltyFallback);
 
     // Acquisition setup cost with user sensitivity exponent
     const baseCost = getContextDifficultyCost(x);
@@ -952,6 +1005,64 @@ function initSpatialVisualizer() {
 
   $('#spatialAutoOrbitBtn')?.addEventListener('click', toggleAutoOrbit);
   $('#modalAutoOrbitBtn')?.addEventListener('click', toggleAutoOrbit);
+
+  // Phone Gyroscope Tilt-to-Orbit
+  async function toggleGyroOrbit() {
+    if (!spatial.gyroActive) {
+      if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const perm = await DeviceOrientationEvent.requestPermission();
+          if (perm !== 'granted') {
+            toast('Gyroscope permission denied');
+            return;
+          }
+        } catch (err) {
+          console.warn('Gyro permission error:', err);
+        }
+      }
+
+      spatial.gyroActive = true;
+      spatial.gyroBaseline = { beta: null, gamma: null };
+      $('#spatialGyroBtn')?.classList.add('active');
+      $('#modalGyroBtn')?.classList.add('active');
+      toast('📱 Gyroscope active · Tilt phone to orbit 3D workcell');
+    } else {
+      spatial.gyroActive = false;
+      spatial.gyroBaseline = { beta: null, gamma: null };
+      $('#spatialGyroBtn')?.classList.remove('active');
+      $('#modalGyroBtn')?.classList.remove('active');
+      toast('Gyroscope orbit disabled');
+    }
+  }
+
+  function handleDeviceOrientation(e) {
+    if (!spatial.gyroActive || spatial.isDragging) return;
+    const beta = e.beta;   // front/back tilt (-180 to 180)
+    const gamma = e.gamma; // left/right tilt (-90 to 90)
+
+    if (beta === null || gamma === null) return;
+
+    if (spatial.gyroBaseline.beta === null) {
+      spatial.gyroBaseline.beta = beta;
+      spatial.gyroBaseline.gamma = gamma;
+      return;
+    }
+
+    const deltaGamma = gamma - spatial.gyroBaseline.gamma;
+    const deltaBeta = beta - spatial.gyroBaseline.beta;
+
+    // Smooth gyro update with deadband
+    if (Math.abs(deltaGamma) > 0.8) {
+      spatial.targetYaw = 0.65 + deltaGamma * 0.032;
+    }
+    if (Math.abs(deltaBeta) > 0.8) {
+      spatial.targetPitch = Math.min(1.52, Math.max(-0.15, 0.46 + deltaBeta * 0.024));
+    }
+  }
+
+  window.addEventListener('deviceorientation', handleDeviceOrientation, { passive: true });
+  $('#spatialGyroBtn')?.addEventListener('click', toggleGyroOrbit);
+  $('#modalGyroBtn')?.addEventListener('click', toggleGyroOrbit);
 
   // View Mode Cycle (Shaded -> Wireframe -> Collision -> Shaded)
   function cycleViewMode() {
@@ -1844,7 +1955,9 @@ async function beginCapture() {
     };
     stream = await navigator.mediaDevices.getUserMedia(constraints);
     $('#preview').srcObject = stream;
-    $('#systemStatusText').textContent = 'Camera Vision Active';
+    $('#systemStatusText').textContent = visionModel
+      ? `Camera + MobileNet Active · ${modelBackend.toUpperCase()}`
+      : 'Camera Active · Model Fallback';
     $('#recState').textContent = 'STANDBY · READY';
   } catch (err) {
     console.warn('Camera fallback:', err);
@@ -1893,6 +2006,12 @@ function sampleFrame() {
     snap.getContext('2d').drawImage(canvas, 0, 0);
     capturedFrameCanvases.push(snap);
     updateKeyframeLiveStrip();
+
+    // Run the open-source MobileNet backbone on alternating keyframes. The
+    // cloned canvas prevents subsequent camera frames from changing inference input.
+    if (visionModel && capturedFrameCanvases.length % 2 === 1) {
+      embeddingPromises.push(extractMobileNetEmbedding(snap));
+    }
 
     // Compute pixel metrics
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -1950,6 +2069,22 @@ function sampleFrame() {
   }
 }
 
+async function extractMobileNetEmbedding(canvas) {
+  let tensor;
+  try {
+    tensor = visionModel.infer(canvas, true);
+    embeddingSamples.push(Array.from(await tensor.data()));
+    if (objectLabels.length < 3) {
+      const prediction = await visionModel.classify(canvas, 1);
+      if (prediction[0]) objectLabels.push(prediction[0].className);
+    }
+  } catch (error) {
+    console.warn('MobileNet keyframe inference skipped:', error);
+  } finally {
+    tensor?.dispose();
+  }
+}
+
 function updateKeyframeLiveStrip() {
   const container = $('#keyframeLiveStrip');
   const label = $('#keyframeCountLabel');
@@ -1986,6 +2121,9 @@ function toggleRecording() {
   chunks = [];
   frameMetrics = [];
   capturedFrameCanvases = [];
+  embeddingSamples = [];
+  embeddingPromises = [];
+  objectLabels = [];
   sampleFrame();
   sampleTicker = setInterval(sampleFrame, 500);
 
@@ -2016,12 +2154,13 @@ function toggleRecording() {
   }, 1000);
 }
 
-function finishRecording() {
+async function finishRecording() {
   clearInterval(sampleTicker);
   clearInterval(ticker);
   sampleFrame();
 
   recordedBlob = new Blob(chunks, { type: 'video/webm' });
+  await Promise.allSettled(embeddingPromises);
   analyzeFrames();
   endCamera();
   showView('reviewView');
@@ -2061,7 +2200,9 @@ function analyzeFrames() {
 
   $('#processBar').style.width = '100%';
   setTimeout(() => {
-    $('#processState').textContent = `${frames.length} KEYFRAMES ANALYZED · PROPOSALS READY`;
+    $('#processState').textContent = visionModel
+      ? `${embeddingSamples.length} MOBILENET EMBEDDINGS · ${modelBackend.toUpperCase()}`
+      : `${frames.length} KEYFRAMES · HEURISTIC FALLBACK`;
     $('#saveClip').disabled = false;
   }, 600);
 }
@@ -2127,12 +2268,23 @@ async function commitClip() {
   const beforeReadiness = calculateReadiness().total;
   const notes = $('#operatorNotes')?.value || '';
 
+  const embedding = embeddingSamples.length
+    ? embeddingSamples[0].map((_, i) => embeddingSamples.reduce((sum, item) => sum + (item[i] || 0), 0) / embeddingSamples.length)
+    : undefined;
+
   const newRecord = {
     id: `live-${Date.now().toString(36).toUpperCase()}`,
     created: Date.now(),
     source: 'live',
     ...proposedTags,
     notes,
+    embedding,
+    model: {
+      name: visionModel ? 'MobileNetV1 alpha-0.25' : 'heuristic-fallback',
+      backend: modelBackend,
+      keyframes: embeddingSamples.length,
+      topLabel: objectLabels[0] || null
+    },
     video: recordedBlob
   };
 
@@ -2391,6 +2543,7 @@ function initEventListeners() {
 
 // Launch
 document.addEventListener('DOMContentLoaded', () => {
+  loadVisionModel();
   initEventListeners();
   initSpatialVisualizer();
   loadDataset();
