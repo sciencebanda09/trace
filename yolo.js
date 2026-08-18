@@ -69,7 +69,7 @@ export async function detectObjects(source, confidenceThreshold = 0.32) {
     const height = at(3, i) / size * sourceHeight;
     const x = at(0, i) / size * sourceWidth - width / 2;
     const y = at(1, i) / size * sourceHeight - height / 2;
-    boxes.push({ x, y, width, height, confidence, classId, label: LABELS[classId], relativeDepth: Math.min(1, 1 - Math.sqrt(width * height / (sourceWidth * sourceHeight))) });
+    boxes.push({ x, y, width, height, confidence, classId, label: LABELS[classId] });
   }
   return suppress(boxes);
 }
@@ -92,29 +92,4 @@ export function drawDetections(canvas, detections, sourceWidth, sourceHeight) {
     ctx.fillRect(x, Math.max(0, y - 20), tw, 20);
     ctx.fillStyle = '#04110b'; ctx.fillText(text, x + 5, Math.max(14, y - 6));
   });
-}
-
-export function drawScene25D(canvas, detections = []) {
-  const rect = canvas.getBoundingClientRect();
-  canvas.width = Math.max(320, Math.round(rect.width * devicePixelRatio));
-  canvas.height = Math.max(220, Math.round(rect.height * devicePixelRatio));
-  const ctx = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  ctx.fillStyle = '#071019'; ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = 'rgba(56,189,248,.18)'; ctx.lineWidth = 1;
-  for (let i = 0; i < 9; i++) { const y = h * .55 + i * h * .055; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-  for (let i = -8; i <= 8; i++) { ctx.beginPath(); ctx.moveTo(w/2, h*.45); ctx.lineTo(w/2 + i*w*.12, h); ctx.stroke(); }
-  detections.forEach((d, index) => {
-    const depth = d.relativeDepth;
-    const scale = .35 + (1 - depth) * .8;
-    const x = (d.x + d.width/2) / 96 * w;
-    const y = h * (.48 + depth * .34);
-    const bw = Math.max(34, d.width / 96 * w * scale), bh = Math.max(28, d.height / 72 * h * scale);
-    const dx = 10 * scale, dy = -8 * scale;
-    ctx.fillStyle = `hsla(${155 + index * 31},70%,50%,.18)`; ctx.strokeStyle = '#34d399'; ctx.lineWidth = 2;
-    ctx.fillRect(x-bw/2, y-bh, bw, bh); ctx.strokeRect(x-bw/2, y-bh, bw, bh);
-    ctx.beginPath(); ctx.moveTo(x-bw/2,y-bh);ctx.lineTo(x-bw/2+dx,y-bh+dy);ctx.lineTo(x+bw/2+dx,y-bh+dy);ctx.lineTo(x+bw/2,y-bh);ctx.stroke();
-    ctx.fillStyle='#e2e8f0';ctx.font=`${Math.max(12, w/50)}px system-ui`;ctx.fillText(`${d.label} · z≈${depth.toFixed(2)}`,x-bw/2,y+18);
-  });
-  if (!detections.length) { ctx.fillStyle='#8194a7';ctx.font=`${Math.max(14,w/45)}px system-ui`;ctx.textAlign='center';ctx.fillText('No YOLO objects detected',w/2,h/2); }
 }
