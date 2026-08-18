@@ -26,3 +26,6 @@ coverage/
 .cache/
 *.tsbuildinfo
 
+# Local test media
+test-videos/
+
