@@ -1306,5 +1306,5 @@ function render3DWorkcellScene(canvas, isModal = false) {
 }
 
 
-  return { init: initSpatialVisualizer, draw: drawSpatialVisualizer };
+  return { init: initSpatialVisualizer, draw: drawSpatialVisualizer, updateHUD: updateSpatialHUD };
 }

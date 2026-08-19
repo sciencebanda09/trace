@@ -304,7 +304,7 @@ function renderSpotlight() {
   if (hudTarget) hudTarget.textContent = generateInstruction(recommendation);
 
   // Spatial HUD Labels & Telemetry
-  updateSpatialHUD();
+  spatialController?.updateHUD();
 }
 
 function renderCandidateQueue() {
@@ -777,7 +777,7 @@ function initEventListeners() {
 document.addEventListener('DOMContentLoaded', () => {
   deviceCapabilities = detectDeviceCapabilities();
   captureController = createCaptureController({
-    query: $, queryAll: $, taskProfile,
+    query: $, queryAll: $$, taskProfile,
     getClips: () => clips, getRecommendation: () => recommendation,
     getRankedExperiments: () => rankedExperiments, getDeviceCapabilities: () => deviceCapabilities,
     saveRecord, renderAll, calculateReadiness, recommendationEvidence, showView, toast, titleCase, escapeHtml

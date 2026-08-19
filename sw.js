@@ -1,4 +1,4 @@
-const CACHE = 'trace-v13-aspect-ratio';
+const CACHE = 'trace-v14-modular';
 const ASSETS = [
   './',
   './index.html',
@@ -12,6 +12,10 @@ const ASSETS = [
   './core/capture.js',
   './core/simulator.js',
   './core/ui.js',
+  './core/workflow.js',
+  './core/capture-controller.js',
+  './core/spatial-controller.js',
+  './core/recommendation-presenter.js',
   './models/yolov8n.onnx',
   './manifest.webmanifest',
   './icon.svg'
