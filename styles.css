@@ -3821,9 +3821,11 @@ textarea {
   }
 
   .signal-cards-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 6px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
   }
+
+  .signal-card:nth-child(3) { grid-column: 1 / -1; }
 
   .signal-card {
     padding: 10px 8px;
@@ -3845,7 +3847,7 @@ textarea {
 
   .spotlight-actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
   }
 
@@ -4051,27 +4053,9 @@ textarea {
   }
 }
 
-/* Final mobile composition lock: kept last so legacy responsive helpers cannot
-   flatten the bento metrics or split the primary thumb action. */
-@media (max-width: 899px) {
-  .signal-cards-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-    gap: 8px;
-  }
-
-  .signal-card:nth-child(3) { grid-column: 1 / -1; }
-
-  .spotlight-actions {
-    grid-template-columns: minmax(0, 1fr) 48px;
-    gap: 8px;
-  }
-
-  .spotlight-actions #recordThis { grid-column: 1; }
-  .spotlight-actions .mobile-preview-btn { width: 48px; }
-}
-
 /* Guided intake, recommendation trust, and measured learning impact. */
 [hidden] { display: none !important; }
+.dataset-date-cell { font-size: 11px; color: var(--ink-muted); }
 
 .failure-intake-trigger {
   width: 100%;
