@@ -106,6 +106,10 @@
           <span class="active">1 · Review</span><i></i><span>2 · Record</span><i></i><span>3 · Confirm</span>
         </div>
         <div id="modelHealthStrip" class="model-health-strip" aria-label="Perception health"></div>
+        <button id="logFailureBtn" class="failure-intake-trigger" type="button">
+          <span>+ LOG A ROBOT FAILURE</span>
+          <small>Video, context, or operator report</small>
+        </button>
         
         <!-- Clean, Breathable Recommendation Showcase -->
         <div class="spotlight-card">
@@ -795,6 +799,12 @@
           </div>
           <div id="impactComparison" class="impact-comparison" aria-label="Dataset impact"></div>
 
+          <div class="learning-impact-grid" aria-label="Measured learning impact">
+            <div><span>Target examples</span><b id="targetExampleDelta">—</b></div>
+            <div><span>Gap reduction</span><b id="gapReductionDelta">—</b></div>
+          </div>
+          <div id="nextRecommendationReason" class="next-recommendation-reason"></div>
+
           <div class="success-btn-row">
             <button class="btn-primary-large" data-view="homeView">
               <span>EXPLORE RE-RANKED NEXT EXPERIMENT</span>
@@ -928,6 +938,57 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 30-second first-run setup and reusable failure intake -->
+    <div id="onboardingModal" class="workflow-modal" hidden>
+      <div class="workflow-dialog" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+        <div class="workflow-progress"><i id="onboardingProgress"></i></div>
+        <div class="workflow-step active" data-onboarding-step="1">
+          <span class="workflow-kicker">01 / PROJECT</span>
+          <h2 id="onboardingTitle">What are you testing?</h2>
+          <p>Set the context TRACE will use for recommendations.</p>
+          <label>ROBOT OR PLATFORM<input id="setupRobot" autocomplete="off" placeholder="e.g. SO-101 arm"></label>
+          <label>TASK<input id="setupTask" autocomplete="off" placeholder="e.g. Pick and place a cup"></label>
+        </div>
+        <div class="workflow-step" data-onboarding-step="2">
+          <span class="workflow-kicker">02 / FAILURE</span>
+          <h2>What went wrong?</h2>
+          <p>An operator report is enough. Video is optional and stays on this device.</p>
+          <label>FAILURE TYPE<select id="setupFailureType"><option value="missed-grasp">Missed grasp</option><option value="dropped-object">Dropped object</option><option value="collision">Collision</option><option value="perception-error">Perception error</option><option value="other">Other</option></select></label>
+          <label>WHAT HAPPENED?<textarea id="setupFailureNotes" rows="3" placeholder="The gripper lost the cup when it was partially hidden..."></textarea></label>
+          <label class="workflow-file">OPTIONAL FAILURE VIDEO<input id="setupFailureVideo" type="file" accept="video/*"><span>Choose from phone</span></label>
+        </div>
+        <div class="workflow-step" data-onboarding-step="3">
+          <span class="workflow-kicker">03 / DATA</span>
+          <h2>Add existing demonstrations</h2>
+          <p>Import a TRACE JSON dataset now, or continue with the included demo dataset.</p>
+          <label class="workflow-file">OPTIONAL DATASET<input id="setupDataset" type="file" accept="application/json,.json" multiple><span>Choose JSON files</span></label>
+          <div class="workflow-summary" id="setupSummary"></div>
+        </div>
+        <div class="workflow-actions">
+          <button id="onboardingBack" class="btn-glass" type="button" hidden>Back</button>
+          <button id="onboardingSkip" class="btn-ghost" type="button">Use demo data</button>
+          <button id="onboardingNext" class="btn-primary-large" type="button">Continue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Focused pre-camera brief: one decision before capture. -->
+    <div id="captureBriefing" class="workflow-modal" hidden>
+      <div class="workflow-dialog capture-briefing-dialog" role="dialog" aria-modal="true" aria-labelledby="briefingTitle">
+        <button id="closeBriefing" class="workflow-close" aria-label="Close">×</button>
+        <span class="workflow-kicker">READY TO CAPTURE</span>
+        <h2 id="briefingTitle">Record the next-best experiment</h2>
+        <p id="briefingInstruction" class="briefing-instruction"></p>
+        <div id="briefingReason" class="briefing-reason"></div>
+        <div class="briefing-checklist">
+          <div><i>1</i><span>Match the target conditions</span></div>
+          <div><i>2</i><span>Keep the full robot action visible</span></div>
+          <div><i>3</i><span>Record the outcome and any recovery</span></div>
+        </div>
+        <button id="startGuidedCapture" class="btn-primary-large" type="button">OPEN CAMERA →</button>
       </div>
     </div>
 

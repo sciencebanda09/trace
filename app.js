@@ -117,6 +117,8 @@ let detectionCanvases = [];
 let yoloLatencyMs = 0;
 let playbackUrl = null;
 let outcomeConfirmed = false;
+let onboardingStep = 1;
+let onboardingMode = 'first-run';
 
 async function loadYoloModel() {
   const status = $('#yoloLiveStatus');
@@ -258,6 +260,13 @@ async function loadDataset() {
     toast('Using session memory dataset');
   }
   renderAll();
+  try {
+    const savedProject = JSON.parse(localStorage.getItem('trace-project') || 'null');
+    if (savedProject?.task) taskProfile.task = savedProject.task;
+    if (!localStorage.getItem('trace-onboarding-complete')) openOnboarding(1, 'first-run');
+  } catch (_) {
+    openOnboarding(1, 'first-run');
+  }
 }
 
 async function saveRecord(row) {
@@ -320,6 +329,86 @@ function generateInstruction(x) {
   return `Test this grasp: ${titleCase(occl)} · ${titleCase(x.orientation)} object · ${titleCase(x.lighting)} light · ${titleCase(x.environment)}.${recoveryNote}`;
 }
 
+function recommendationEvidence(target = recommendation) {
+  if (!target) return { matching: 0, failures: 0, text: 'TRACE is calculating the strongest evidence.' };
+  const failures = clips.filter(clip => clip.result === 'failure');
+  const matching = failures.filter(failure =>
+    ['occlusion', 'lighting', 'orientation', 'environment'].filter(key => failure[key] === target[key]).length >= 2
+  ).length;
+  const exampleWord = target.count === 1 ? 'demonstration' : 'demonstrations';
+  return {
+    matching,
+    failures: failures.length,
+    text: `Ranked #${activeRankIndex + 1} because ${matching} of ${failures.length} logged failures share these conditions, but the dataset contains only ${target.count} matching ${exampleWord}.`
+  };
+}
+
+function setOnboardingStep(step) {
+  onboardingStep = Math.max(1, Math.min(3, step));
+  $$('.workflow-step').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.onboardingStep) === onboardingStep));
+  if ($('#onboardingProgress')) $('#onboardingProgress').style.width = `${onboardingStep * 33.333}%`;
+  if ($('#onboardingBack')) $('#onboardingBack').hidden = onboardingStep === 1;
+  if ($('#onboardingNext')) $('#onboardingNext').textContent = onboardingStep === 3 ? (onboardingMode === 'failure' ? 'LOG FAILURE' : 'BUILD FIRST RECOMMENDATION') : 'Continue';
+  if ($('#setupSummary') && onboardingStep === 3) {
+    const robot = $('#setupRobot')?.value.trim() || 'your robot';
+    const task = $('#setupTask')?.value.trim() || 'the manipulation task';
+    $('#setupSummary').textContent = `TRACE will analyze ${robot} performing ${task}, connect the reported failure to dataset gaps, and rank the next capture.`;
+  }
+}
+
+function openOnboarding(step = 1, mode = 'first-run') {
+  onboardingMode = mode;
+  const modal = $('#onboardingModal');
+  if (!modal) return;
+  modal.hidden = false;
+  setOnboardingStep(step);
+  setTimeout(() => (step === 1 ? $('#setupRobot') : $('#setupFailureNotes'))?.focus(), 50);
+}
+
+function closeOnboarding() {
+  if ($('#onboardingModal')) $('#onboardingModal').hidden = true;
+}
+
+async function finishOnboarding({ skip = false } = {}) {
+  const robot = $('#setupRobot')?.value.trim() || 'Generic robot';
+  const task = $('#setupTask')?.value.trim() || taskProfile.task;
+  taskProfile.task = task;
+  try {
+    localStorage.setItem('trace-project', JSON.stringify({ robot, task }));
+    localStorage.setItem('trace-onboarding-complete', 'true');
+  } catch (_) {}
+
+  if (!skip) {
+    const datasetFiles = $('#setupDataset')?.files;
+    if (datasetFiles?.length) await importDatasetFiles(datasetFiles);
+    const notes = $('#setupFailureNotes')?.value.trim();
+    const video = $('#setupFailureVideo')?.files?.[0];
+    if (notes || video || onboardingMode === 'failure') {
+      const target = recommendation || scoreAll()[0] || { occlusion:'partial', lighting:'normal', orientation:'upright', environment:'bench' };
+      const failure = {
+        id: `failure-${Date.now().toString(36).toUpperCase()}`,
+        created: Date.now(), source: 'operator-report', task, object: 'unknown object',
+        occlusion: target.occlusion, lighting: target.lighting, orientation: target.orientation, environment: target.environment,
+        result: 'failure', recovery: 'no', failureType: $('#setupFailureType')?.value || 'other',
+        notes: notes || 'Failure logged by operator', video: video || undefined,
+        sourceDevice: describeSourceDevice(), evidence: [{ attribute:'result', method:'operator-confirmed', confidence:1 }]
+      };
+      clips.push(failure);
+      await saveRecord(failure);
+      renderAll();
+      toast('Failure logged and priorities recalculated');
+    }
+  }
+  closeOnboarding();
+}
+
+function openCaptureBriefing() {
+  if (!recommendation) return;
+  $('#briefingInstruction').textContent = generateInstruction(recommendation);
+  $('#briefingReason').textContent = recommendationEvidence().text;
+  $('#captureBriefing').hidden = false;
+}
+
 /* ==========================================================================
    UI Rendering
    ========================================================================== */
@@ -351,7 +440,7 @@ function renderSpotlight() {
     ['occlusion', 'lighting', 'orientation', 'environment'].filter(k => f[k] === recommendation[k]).length >= 2
   ).length;
 
-  $('#rationale').textContent = `${matching}/${failures.length} failures match these conditions · ${recommendation.count} existing examples.`;
+  $('#rationale').textContent = recommendationEvidence(recommendation).text;
   const story = $('#failureStory');
   if (story) story.innerHTML = `
     <div><b>${failures.length}</b><span>logged failures</span></div><i>→</i>
@@ -2496,6 +2585,7 @@ async function commitClip() {
   if (!outcomeConfirmed) { toast('Confirm the actual outcome before saving'); return; }
   const beforeReadiness = calculateReadiness().total;
   const beforeImpact = distributionSnapshot();
+  const beforeRecommendation = recommendation ? { ...recommendation } : null;
   const notes = $('#operatorNotes')?.value || '';
 
   const embedding = embeddingSamples.length
@@ -2543,6 +2633,17 @@ async function commitClip() {
   $('#oldCoverage').textContent = `${beforeReadiness}%`;
   $('#newCoverage').textContent = `${afterReadiness}%`;
   renderImpactComparison(beforeImpact, distributionSnapshot());
+
+  if (beforeRecommendation) {
+    const contextKeys = ['occlusion', 'lighting', 'orientation', 'environment'];
+    const updatedTarget = rankedExperiments.find(item => contextKeys.every(key => item[key] === beforeRecommendation[key]));
+    const addedExamples = Math.max(0, (updatedTarget?.count ?? beforeRecommendation.count) - beforeRecommendation.count);
+    const gapReduction = Math.max(0, Math.round((beforeRecommendation.gap - (updatedTarget?.gap ?? beforeRecommendation.gap)) * 100));
+    if ($('#targetExampleDelta')) $('#targetExampleDelta').textContent = `${beforeRecommendation.count} → ${updatedTarget?.count ?? beforeRecommendation.count}`;
+    if ($('#gapReductionDelta')) $('#gapReductionDelta').textContent = addedExamples ? `−${gapReduction} pts` : 'Rebalanced';
+    const nextChanged = recommendation && contextKeys.some(key => recommendation[key] !== beforeRecommendation[key]);
+    if ($('#nextRecommendationReason')) $('#nextRecommendationReason').innerHTML = `<b>${nextChanged ? 'NEXT PRIORITY CHANGED' : 'PRIORITY RECALCULATED'}</b><br>${escapeHtml(recommendationEvidence().text)}`;
+  }
 
   const recDetail = proposedTags.recovery === 'yes' ? ' with recovery attempt' : '';
   $('#successCopy').textContent = `${formatDuration(recordedDurationSeconds)} demonstration saved: ${titleCase(proposedTags.occlusion)} occlusion · ${titleCase(proposedTags.lighting)} light · ${titleCase(proposedTags.result)}${recDetail}. Rankings were recalculated from the updated dataset.`;
@@ -2693,9 +2794,18 @@ function initEventListeners() {
   });
 
   // Capture buttons
-  $('#quickRecordBtn')?.addEventListener('click', beginCapture);
-  $('#quickRecordMobile')?.addEventListener('click', beginCapture);
-  $('#recordThis')?.addEventListener('click', beginCapture);
+  $('#quickRecordBtn')?.addEventListener('click', openCaptureBriefing);
+  $('#quickRecordMobile')?.addEventListener('click', openCaptureBriefing);
+  $('#recordThis')?.addEventListener('click', openCaptureBriefing);
+  $('#logFailureBtn')?.addEventListener('click', () => openOnboarding(2, 'failure'));
+  $('#onboardingBack')?.addEventListener('click', () => setOnboardingStep(onboardingStep - 1));
+  $('#onboardingNext')?.addEventListener('click', async () => {
+    if (onboardingStep < 3) setOnboardingStep(onboardingStep + 1);
+    else await finishOnboarding();
+  });
+  $('#onboardingSkip')?.addEventListener('click', () => finishOnboarding({ skip: true }));
+  $('#closeBriefing')?.addEventListener('click', () => { $('#captureBriefing').hidden = true; });
+  $('#startGuidedCapture')?.addEventListener('click', () => { $('#captureBriefing').hidden = true; beginCapture(); });
   $('#quickSimulateBtn')?.addEventListener('click', injectSyntheticDemo);
   $('#reRecordBtn')?.addEventListener('click', () => { if (playbackUrl) URL.revokeObjectURL(playbackUrl); playbackUrl=null; beginCapture(); });
   $$('[data-confirm-result]').forEach(button => button.addEventListener('click', () => {
