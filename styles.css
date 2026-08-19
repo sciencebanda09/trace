@@ -4161,3 +4161,39 @@ textarea {
   .workflow-modal { place-items: center; padding: 24px; }
   .workflow-dialog { border-bottom: 1px solid var(--border-card); border-radius: var(--radius-lg); }
 }
+
+/* Evidence-first phone surface: diagnostics remain available on larger screens
+   and during review, but do not compete with the next physical action. */
+@media (max-width: 899px) {
+  #modelHealthStrip,
+  .spotlight-actions .mobile-preview-btn,
+  .mobile-bottom-nav [data-view="weightsView"] {
+    display: none !important;
+  }
+
+  .spotlight-actions {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .spotlight-actions #recordThis {
+    grid-column: 1 / -1;
+  }
+
+  .signal-card:nth-child(3) {
+    background: var(--glass-surface);
+    color: var(--ink-primary);
+  }
+
+  .signal-card:nth-child(3) .signal-label,
+  .signal-card:nth-child(3) .signal-number {
+    color: var(--ink-primary);
+  }
+
+  .signal-card:nth-child(3) .signal-bar-track {
+    background: rgba(255,255,255,.06);
+  }
+
+  .signal-card:nth-child(3) .signal-bar-fill {
+    background: var(--emerald);
+  }
+}

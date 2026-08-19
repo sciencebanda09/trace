@@ -348,7 +348,7 @@ function setOnboardingStep(step) {
   $$('.workflow-step').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.onboardingStep) === onboardingStep));
   if ($('#onboardingProgress')) $('#onboardingProgress').style.width = `${onboardingStep * 33.333}%`;
   if ($('#onboardingBack')) $('#onboardingBack').hidden = onboardingStep === 1;
-  if ($('#onboardingNext')) $('#onboardingNext').textContent = onboardingStep === 3 ? (onboardingMode === 'failure' ? 'LOG FAILURE' : 'BUILD FIRST RECOMMENDATION') : 'Continue';
+  if ($('#onboardingNext')) $('#onboardingNext').textContent = onboardingStep === 3 ? (onboardingMode === 'failure' ? 'LOG FAILURE' : 'SHOW WHAT TO RECORD') : 'Continue';
   if ($('#setupSummary') && onboardingStep === 3) {
     const robot = $('#setupRobot')?.value.trim() || 'your robot';
     const task = $('#setupTask')?.value.trim() || 'the manipulation task';
@@ -449,9 +449,9 @@ function renderSpotlight() {
     <div class="story-target"><b>#${activeRankIndex+1}</b><span>collect next</span></div>`;
 
   // Signal Metrics
-  $('#failureScore').textContent = pct(recommendation.failure);
-  $('#gapScore').textContent = pct(recommendation.gap);
-  $('#priorityScore').textContent = recommendation.priority.toFixed(2);
+  $('#failureScore').textContent = `${matching}/${failures.length}`;
+  $('#gapScore').textContent = String(recommendation.count);
+  $('#priorityScore').textContent = `#${activeRankIndex + 1}`;
 
   $('#failureBar').style.width = pct(recommendation.failure);
   $('#gapBar').style.width = pct(recommendation.gap);
@@ -2646,7 +2646,7 @@ async function commitClip() {
   }
 
   const recDetail = proposedTags.recovery === 'yes' ? ' with recovery attempt' : '';
-  $('#successCopy').textContent = `${formatDuration(recordedDurationSeconds)} demonstration saved: ${titleCase(proposedTags.occlusion)} occlusion · ${titleCase(proposedTags.lighting)} light · ${titleCase(proposedTags.result)}${recDetail}. Rankings were recalculated from the updated dataset.`;
+  $('#successCopy').textContent = `${formatDuration(recordedDurationSeconds)} attempt saved: ${titleCase(proposedTags.occlusion)} occlusion · ${titleCase(proposedTags.lighting)} light · ${titleCase(proposedTags.result)}${recDetail}. TRACE checked the updated evidence and recalculated what to record next.`;
 
   showView('successView');
 }
