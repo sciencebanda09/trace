@@ -1,5 +1,5 @@
 import { initYolo, detectObjects, drawDetections, getYoloRuntime } from '../yolo.js';
-import { TRACE_SCHEMA as SCHEMA } from './schema.js';
+import { TRACE_SCHEMA as SCHEMA, CAPTURE_CONFIG } from './schema.js';
 import { calibrationCorrection, confidenceLabel } from './evidence.js';
 import { describeSourceDevice, formatClock } from './capture.js';
 
