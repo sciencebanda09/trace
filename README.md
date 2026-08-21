@@ -41,6 +41,10 @@ flowchart TD
 
 The ranking layer is deterministic and inspectable. Natural-language instructions are generated from the highest-ranked structured result; language generation does not choose the priority.
 
+## Impact metric
+
+The home screen reports a live, dataset-derived impact preview: current coverage versus projected coverage after recording the recommended context. The projection adds one reviewed demonstration to the selected context combination, so it is an operational planning metric rather than a claimed benchmark. During a judging demo, show the metric before capture, record or ingest the attempt, and show the recalculated coverage and next priority.
+
 ## Priority engine
 
 For every context combination, TRACE computes:

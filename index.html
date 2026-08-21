@@ -105,6 +105,13 @@
         <div class="mobile-flow-guide" aria-label="TRACE workflow">
           <span class="active">1 · Review</span><i></i><span>2 · Record</span><i></i><span>3 · Confirm</span>
         </div>
+        <section class="impact-strip" aria-label="TRACE value proposition">
+          <div class="impact-mark">TRACE</div>
+          <div>
+            <strong>Turn every robot failure into the next best experiment.</strong>
+            <span>Failure-weighted recommendations · explainable scoring · local-first capture</span>
+          </div>
+        </section>
         <div id="modelHealthStrip" class="model-health-strip" aria-label="Perception health"></div>
         <button id="logFailureBtn" class="failure-intake-trigger" type="button">
           <span>+ LOG A ROBOT FAILURE</span>
@@ -130,6 +137,19 @@
           </div>
 
           <div id="failureStory" class="failure-story" aria-label="Why this experiment ranks first"></div>
+
+          <div class="impact-proof" aria-label="Measured impact preview">
+            <div class="impact-proof-heading">
+              <span class="impact-proof-kicker">MEASURED IMPACT · LIVE DATASET</span>
+              <span class="impact-proof-note">What one targeted capture changes</span>
+            </div>
+            <div class="impact-proof-grid">
+              <div><b id="impactCurrentCoverage">—</b><span>current coverage</span></div>
+              <i>→</i>
+              <div><b id="impactNextCoverage">—</b><span>after this capture</span></div>
+              <div class="impact-proof-callout"><b id="impactLift">—</b><span>coverage lift</span></div>
+            </div>
+          </div>
 
           <div class="spotlight-main-grid">
             

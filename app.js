@@ -173,6 +173,17 @@ function calculateReadiness() {
   return { total: calculateDatasetReadiness(clips, SCHEMA) };
 }
 
+function calculateImpactPreview(target) {
+  const current = calculateDatasetReadiness(clips, SCHEMA);
+  const alreadyCovered = clips.some(clip =>
+    ['occlusion', 'lighting', 'orientation', 'environment'].every(key => clip[key] === target[key])
+  );
+  const projected = alreadyCovered
+    ? current
+    : calculateDatasetReadiness([...clips, { ...target, result: 'success', recovery: 'no' }], SCHEMA);
+  return { current, projected, lift: projected - current };
+}
+
 function pct(n) {
   return `${Math.round(n * 100)}%`;
 }
@@ -278,6 +289,11 @@ function renderSpotlight() {
   $('#activeRankBadge').textContent = `RANK #${String(activeRankIndex + 1).padStart(2, '0')}`;
   $('#coverage').textContent = calculateReadiness().total;
   $('#tabClipCount').textContent = clips.length;
+
+  const impact = calculateImpactPreview(recommendation);
+  $('#impactCurrentCoverage').textContent = `${impact.current}%`;
+  $('#impactNextCoverage').textContent = `${impact.projected}%`;
+  $('#impactLift').textContent = impact.lift > 0 ? `+${impact.lift} pts` : 'new evidence';
 
   // Dynamic Target Configuration Badges
   const pillsContainer = $('#targetTagPills');

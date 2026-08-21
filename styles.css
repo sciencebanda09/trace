@@ -4181,3 +4181,60 @@ textarea {
     background: var(--emerald);
   }
 }
+.impact-strip {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding: 13px 16px;
+  border: 1px solid rgba(186, 255, 90, .28);
+  border-radius: 12px;
+  background: linear-gradient(90deg, rgba(186, 255, 90, .10), rgba(19, 39, 31, .34));
+}
+
+.impact-mark {
+  flex: 0 0 auto;
+  color: var(--lime, #baff5a);
+  font: 700 11px/1 'JetBrains Mono', monospace;
+  letter-spacing: .16em;
+}
+
+.impact-strip strong,
+.impact-strip span { display: block; }
+.impact-strip strong { color: var(--text, #f2f5ef); font-size: 14px; }
+.impact-strip span { margin-top: 4px; color: var(--muted, #8c978f); font-size: 11px; }
+
+@media (max-width: 600px) {
+  .impact-strip { align-items: flex-start; margin-bottom: 12px; padding: 12px; }
+  .impact-strip strong { font-size: 12px; line-height: 1.35; }
+  .impact-strip span { font-size: 10px; line-height: 1.35; }
+}
+
+.impact-proof {
+  margin: 18px 0 22px;
+  padding: 14px 16px;
+  border: 1px solid rgba(106, 224, 171, .22);
+  border-radius: 12px;
+  background: rgba(16, 35, 29, .48);
+}
+
+.impact-proof-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.impact-proof-kicker { color: #baff5a; font: 600 10px/1.2 'JetBrains Mono', monospace; letter-spacing: .12em; }
+.impact-proof-note { color: #8c978f; font-size: 11px; }
+.impact-proof-grid { display: flex; align-items: center; gap: 18px; margin-top: 12px; }
+.impact-proof-grid > div:not(.impact-proof-callout) { min-width: 86px; }
+.impact-proof-grid b, .impact-proof-grid span { display: block; }
+.impact-proof-grid b { color: #f2f5ef; font-size: 24px; line-height: 1; }
+.impact-proof-grid span { margin-top: 5px; color: #8c978f; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.impact-proof-grid i { color: #baff5a; font-style: normal; font-size: 20px; }
+.impact-proof-callout { margin-left: auto; padding-left: 18px; border-left: 1px solid rgba(242,245,239,.15); }
+.impact-proof-callout b { color: #baff5a; }
+
+@media (max-width: 600px) {
+  .impact-proof { margin: 12px 0 16px; padding: 12px; }
+  .impact-proof-heading { display: block; }
+  .impact-proof-note { display: block; margin-top: 4px; }
+  .impact-proof-grid { gap: 10px; }
+  .impact-proof-grid b { font-size: 20px; }
+  .impact-proof-callout { padding-left: 10px; }
+}
